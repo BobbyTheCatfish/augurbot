@@ -2,7 +2,8 @@ const fs = require("fs"),
   Discord = require("discord.js"),
   {Collection, Client, Message} = Discord,
   axios = require("axios"),
-  path = require("path");
+  path = require("path"),
+  u = require('../../utils/utils')
 
 /************************
 **  DEFAULT FUNCTIONS  **
@@ -18,13 +19,12 @@ const DEFAULTS = {
     }
     console.error(error);
   },
-  parse: (msg) => {
+  parse: async (msg) => {
     let content = msg.content;
-    let setPrefix = msg.client.config.prefix || "!";
+    let setPrefix = await u.prefix(msg)
     if (msg.author.bot) return null;
     for (let prefix of [setPrefix, `<@${msg.client.user.id}>`, `<@!${msg.client.user.id}>`]) {
       if (!content.startsWith(prefix)) continue;
-      let trimmed = content.substr(prefix.length).trim();
       let [command, ...params] = content.substr(prefix.length).split(" ");
       if (command) {
         return {
@@ -100,20 +100,20 @@ class DiscordInteraction {
       const response = {
         type: 4,
         data: {
-          tts: false,
+          tts: options.tts ?? false,
           content,
           embeds: options.embeds,
           allowed_mentions: options.allowed_mentions,
           flags: options.flags
         }
       };
-      let apiReponse = await this._call(url, response, "post");
-      return new DiscordInteractionResponse(this, apiReponse);
+      let apiResponse = await this._call(url, response, "post");
+      return new DiscordInteractionResponse(this, apiResponse);
     }
   }
 
   async createFollowup(content, options = {}) {
-    let url = `/webhooks/${this.client.user.id}/${this.token}`;
+    let url = `/webhooks/${this.client.applicationId}/${this.token}`;
 
     if (typeof content != "string") {
       options = content;
@@ -134,14 +134,19 @@ class DiscordInteraction {
     return new DiscordInteractionResponse(this, apiReponse);
   }
 
-  async deleteResponse(message = "@original") {
-    let url = `/webhooks/${this.client.user.id}/${this.token}/messages/${(message.id ? message.id : message)}`;
-    let apiResponse = await this._call(url, undefined, "delete");
-    return message;
+  deleteResponse(message = "@original", timeout = 0) {
+    return new Promise((fulfill, reject) => {
+      try {
+        setTimeout(() => {
+          let url = `/webhooks/${this.client.applicationId}/${this.token}/messages/${(message.id ? message.id : message)}`;
+          let apiResponse = this._call(url, undefined, "delete").then(fulfill, reject);
+        }, timeout);
+      } catch(e) { reject(e); }
+    });
   }
 
   async editResponse(content, options = {}, message = "@original") {
-    let url = `/webhooks/${this.client.user.id}/${this.token}/messages/${(message.id ? message.id : message)}`;
+    let url = `/webhooks/${this.client.applicationId}/${this.token}/messages/${(message.id ? message.id : message)}`;
 
     if (typeof content != "string") {
       options = content;
@@ -243,7 +248,10 @@ class CommandManager extends Collection {
   register(load) {
     for (const command of load.commands) {
       try {
-        command.file = load.filepath;
+        command.file = load.file;
+        command.client = load.client;
+        if (!command.category) command.category = path.basename(command.file, ".js");
+
         if (!this.has(command.name.toLowerCase()))
           this.set(command.name.toLowerCase(), command);
         if (command.aliases.length > 0) {
@@ -267,8 +275,8 @@ class EventManager extends Collection {
   register(load) {
     if (load.events?.size > 0) {
       for (const [event, handler] of load.events) {
-        if (!this.has(event)) this.set(event, new Collection([[load.filepath, handler]]));
-        else this.get(event).set(load.filepath, handler);
+        if (!this.has(event)) this.set(event, new Collection([[load.file, handler]]));
+        else this.get(event).set(load.file, handler);
       }
     }
     return this;
@@ -284,7 +292,7 @@ class InteractionManager extends Collection {
   async _call(url, data, method = "get") {
     return (await axios({
       url,
-      baseURL: `https://discord.com/api/v8/applications/${this.client.user.id}`,
+      baseURL: `https://discord.com/api/v8/applications/${this.client.applicationId}`,
       method,
       headers: { "Authorization": `Bot ${this.client.token}` },
       data
@@ -369,10 +377,7 @@ class ModuleManager {
         load.config = this.client.config;
         load.db = this.client.db;
         load.client = this.client;
-        load.file = file;
-        for (const command of load.commands) {
-          if (!command.category) command.cateogry = path.basename(file, ".js");
-        }
+        load.file = filepath;
 
         // REGISTER COMMANDS & ALIASES
         this.commands.register(load);
@@ -508,6 +513,7 @@ class AugurClient extends Client {
     this.db = (this.config.db?.model ? require(path.resolve((require.main ? path.dirname(require.main.filename) : process.cwd()), this.config.db.model)) : null);
     this.errorHandler = this.augurOptions.errorHandler || DEFAULTS.errorHandler;
     this.parse = this.augurOptions.parse || DEFAULTS.parse;
+    this.utils = this.augurOptions.utils
 
     // PRE-LOAD COMMANDS
     if (this.augurOptions?.commands) {
@@ -527,16 +533,19 @@ class AugurClient extends Client {
       }
     }
 
+
     // SET EVENT HANDLERS
+    this.once("ready", async () => {
+      this.applicationId = (await this.fetchApplication()).id;
+    });
+
     this.on("ready", async () => {
       console.log(`${this.user.username} ${(this.shard ? ` Shard ${this.shard.id}` : "")} ready at: ${Date()}`);
       console.log(`Listening to ${this.channels.cache.size} channels in ${this.guilds.cache.size} servers.`);
-      let halt = false;
       if (this.events.has("ready")) {
         for (let [file, handler] of this.events.get("ready")) {
           try {
-            halt = await handler();
-            if (halt) break;
+            if (await handler()) break;
           } catch(error) {
             this.errorHandler(error, `Ready Handler: ${file}`);
           }
@@ -617,7 +626,7 @@ class AugurClient extends Client {
         }
       }
       try {
-        if (!halt) await this.interactions.get(interaction.commandId)?.process(interaction);
+        if (!halt) await this.interactions.get(interaction.commandId)?.execute(interaction);
       } catch(error) {
         this.errorHandler(error, `Interaction Processing: ${interaction.commandId}`);
       }
@@ -627,16 +636,6 @@ class AugurClient extends Client {
       if (data.t == "INTERACTION_CREATE") {
         const interaction = new DiscordInteraction(this, data.d);
         this.emit("interactionCreate", interaction);
-      }
-      if (this.events.has("raw")) {
-        for (let [file, handler] of this.events.get("raw")) {
-          try {
-            if (await handler(data)) break;
-          } catch(error) {
-            this.errorHandler(error, `raw Handler: ${file}`);
-            break;
-          }
-        }
       }
     });
 
@@ -648,6 +647,13 @@ class AugurClient extends Client {
               await reaction.fetch();
             } catch(error) {
               this.errorHandler(error, "Augur Fetch Partial Message Reaction Error");
+            }
+          }
+          if (reaction.message?.partial) {
+            try {
+              await reaction.message.fetch();
+            } catch(error) {
+              this.errorHandler(error, "Augur Fetch Partial Reaction.Message Error");
             }
           }
           for (let [file, handler] of this.events.get("messageReactionAdd")) {
@@ -662,7 +668,7 @@ class AugurClient extends Client {
       });
     }
 
-    let events = (this.config?.events || []).filter(event => !["message", "messageUpdate", "interactionCreate", "messageReactionAdd", "ready", "raw"].includes(event));
+    let events = (this.config?.events || []).filter(event => !["message", "messageUpdate", "interactionCreate", "messageReactionAdd", "ready"].includes(event));
 
     for (let event of events) {
       this.on(event, async (...args) => {
@@ -706,7 +712,24 @@ class AugurModule {
     this.config = {};
   }
 
-  addCommand(info) {
+  addCommand(info = {
+    name: String,
+    aliases: Array,
+    syntax: String,
+    description: String,
+    info: String,
+    hidden: Boolean,
+    category: String,
+    enabled: Boolean,
+    otherPerms: Function,
+    permissions: Array,
+    parseParams: Function,
+    options: Object,
+    ownerOnly: Boolean,
+    guildOnly: Boolean,
+    dmOnly: Boolean,
+    process: Function
+  }) {
     this.commands.push(new AugurCommand(info, this.client));
     return this;
   }
@@ -716,8 +739,24 @@ class AugurModule {
     return this;
   }
 
-  addInteraction(info) {
-    this.interactions.push(new AugurInteractionCommand(info));
+  addInteraction(info = {
+    id: String,
+    name: String,
+    syntax: String,
+    description: String,
+    info: String,
+    hidden: Boolean,
+    category: String,
+    enabled: Boolean,
+    options: Object,
+    otherPerms: Function,
+    permissions: Array,
+    process: Function,
+    ownerOnly: Boolean,
+    guildOnly: Boolean,
+    dmOnly: Boolean,
+  }) {
+    this.interactions.push(new AugurInteractionCommand(info, this.client));
     return this;
   }
 
@@ -752,19 +791,28 @@ class AugurCommand {
     this.description = info.description ?? `${this.name} ${this.syntax}`.trim();
     this.info = info.info ?? this.description;
     this.hidden = info.hidden ?? false;
-    this.category = info.category;
+    this.category = info.category ?? "General";
     this.enabled = info.enabled ?? true;
-    this.permissions = info.permissions ?? (() => true);
+    this.otherPerms = info.other || (() => true);
+    this.permissions = info.permissions;
     this.parseParams = info.parseParams ?? false;
     this.options = info.options ?? {};
     this.process = info.process;
+    this.ownerOnly = info.ownerOnly || false;
+    this.guildOnly = info.guildOnly || false;
+    this.dmOnly = info.dmOnly || false;
 
     this.client = client;
   }
 
   async execute(msg, args) {
     try {
-      if (this.enabled && await this.permissions(msg)) return await this.process(msg, args);
+      if(!this.enabled) return
+      else if(this.ownerOnly && msg.author.id != msg.client.config.ownerId) return;
+      else if(this.guildOnly && !msg.guild) return msg.channel.send(`That command can only be used in a server.`).then(m => u.clean([msg, m]));
+      else if(this.dmOnly && msg.guild) return msg.channel.send(`That command can only be used in a DM`).then(m => u.clean([msg, m]));
+      else if(msg.guild ? !msg.member.hasPermission(this.permissions) : false) return msg.channel.send(`You don't have permission to use that command!`)
+      else if (await this.otherPerms(msg)) return await this.process(msg, args);
       else return;
     } catch(error) {
       if (this.client) this.client.errorHandler(error, msg);
@@ -786,16 +834,25 @@ class AugurInteractionCommand {
     this.hidden = info.hidden ?? false;
     this.category = info.category;
     this.enabled = info.enabled ?? true;
-    this.permissions = info.permissions ?? (() => true);
     this.options = info.options ?? {};
+    this.otherPerms = info.other || (() => true);
+    this.permissions = info.permissions;
     this.process = info.process;
+    this.ownerOnly = info.ownerOnly || false;
+    this.guildOnly = info.guildOnly || false;
+    this.dmOnly = info.dmOnly || false;
 
     this.client = client;
   }
 
   async execute(interaction) {
     try {
-      if (!this.enabled) return;
+      if(!this.enabled) return
+      else if(this.ownerOnly && interaction.author.id != this.client.config.ownerId) return;
+      else if(this.guildOnly && !interaction.guild) return interaction.createResponse(`That command can only be used in a server.`).then(u.clean());
+      else if(this.dmOnly && interaction.guild) return interaction.createResponse(`That command can only be used in a DM`).then(u.clean);
+      else if(interaction.guild ? !interaction.member.hasPermission(this.permissions) : false) return interaction.createResponse(`You don't have permission to use that command!`)
+      else if (await this.otherPerms(interaction)) return await this.process(interaction);
       if (await this.permissions(interaction)) return await this.process(interaction);
       let msg = await interaction.createResponse("❌");
       msg.delete(5000).catch(error => this.client.errorHandler(error, "Remove Response After Failed Interaction Permissions Check"));
@@ -810,4 +867,16 @@ class AugurInteractionCommand {
 **  EXPORTS  **
 **************/
 
-module.exports = {AugurClient, Module: AugurModule};
+module.exports = {
+  AugurClient,
+  AugurCommand,
+  AugurInteractionCommand,
+  Module: AugurModule,
+  DiscordInteraction,
+  DiscordInteractionResponse,
+  ClockworkManager,
+  CommandManager,
+  EventManager,
+  InteractionManager,
+  ModuleManager
+};
