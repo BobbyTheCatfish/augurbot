@@ -165,33 +165,41 @@ The `.addCommand()` method defines a new bot command.
 ```
 Module.addCommand({
   name: "commandname",
-  process: async (msg, suffix) => {},
   aliases: [],
-  category: "",
+  syntax: "",
   description: "",
-  enabled: true,
-  hidden: false,
   info: "",
-  options: {},
+  hidden: false,
+  category: "",
+  enabled: true,
+  otherPerms: async (msg) => {},
+  permissions: [],
   parseParams: false,
-  permissions: async (msg) => {},
-  syntax: ""
+  options: {},
+  ownerOnly: false,
+  guildOnly: false,
+  dmOnly: false,
+  process: async (msg, suffix) => {}
 });
 ```
 * `name` (string): Required. A string for the name of the command.
+* `aliases` (array of strings): An array of strings that can can be used as alternate names for the command.
+* `syntax` (string): A string describing command syntax.
+* `description` (string): A short string for a brief overview of the command.
+* `info` (string): A longer string with more details about the command's usage.
+* `hidden` (boolean): A boolean for whether you want to hide the command in your help functions. Defaults to `false`.
+* `category` (string): A category name, for convenience in organizing commands. Defaults to the filename of the module.
+* `enabled` (boolean): Whether the command is able to run. Defaults to `true`.
+* `otherPerms` (function): A function used to determine whether the user has permission to run the command. Accepts a `Discord.Message` object.
+* `permissions` (array of PermissionResolvables): An array that is used to check for a guild member's permissions
+* `parseParams` (boolean): Determines whether to split the command suffix before passing the parameters to the `process` function. Defaults to `false`.
+* `options` (object): An object of custom options that the developer may wish to use (e.g. in parsing messages).
+* `ownerOnly` (boolean): Whether or not the bot owner is the only user allowed to run the command. Defaults to `false`.
+* `guildOnly` (boolean): Determines if the command should only run when used in a guild or not. Defaults to `false`.
+* `dmOnly` (boolean): Determines if the command should only run when used in a DM or not. Defaults to `false`.
 * `process` (function): Required. The function to run when the command is invoked. This accepts either:
   * If `parseParams` is `false`, (message, suffix); a `Discord.Message` object and a `suffix` string of the remainder of the command supplied by the user; or
   * If `parseParams` is `true`, (message, ...params); a `Discord.Message` object and a list of parameters suppried by the user.
-* `aliases` (array of strings): An array of strings that can can be used as alternate names for the command.
-* `category` (string): A category name, for convenience in organizing commands. Defaults to the filename of the module.
-* `description` (string): A short string for a brief overview of the command.
-* `enabled` (boolean): Whether the command is able to run. Defaults to `true`.
-* `hidden` (boolean): A boolean for whether you want to hide the command in your help functions. Defaults to `false`.
-* `info` (string): A longer string with more details about the command's usage.
-* `options` (object): An object of custom options that the developer may wish to use (e.g. in parsing messages).
-* `parseParams` (boolean): Determines whether to split the command suffix before passing the parameters to the `process` function. Defaults to `false`.
-* `permissions` (function): A function used to determine whether the user has permission to run the command. Accepts a `Discord.Message` object.
-* `syntax` (string): A string describing command syntax.
 
 ### Events
 The `.addEvent()` method adds an event handler for the various Discord.js events.
@@ -204,29 +212,37 @@ The `.addInteraction()` method defines an interaction for slash commands.
 ```
 Module.addInteraction({
   id: "interactionId",
-  process: async (interaction) => {},
-  category: "",
+  name: "commandname",
+  syntax: "",
   description: "",
-  enabled: true,
-  hidden: false,
   info: "",
-  name: "slashCommandName",
+  hidden: false,
+  category: "",
+  enabled: true,
+  otherPerms: async (msg) => {},
+  permissions: [],
   options: {},
-  permissions: async (interaction) => {},
-  syntax: ""
+  ownerOnly: false,
+  guildOnly: false,
+  dmOnly: false,
+  process: async (interaction) => {}
 });
 ```
 * `id` (string): Required. The interaction ID for the slash command.
-* `process` (function): Required. The function to run when the slash command is invoked. This accepts a DiscordInteraction object.
-* `category` (string): A category name, for convenience in organizing slash commands. Defaults to the filename of the module.
-* `description` (string): A short string for a brief overview of the slash command.
-* `enabled` (boolean): Whether the slash command is able to run. Defaults to `true`.
-* `hidden` (boolean): A boolean for whether you want to hide the slash command in your help functions. Defaults to `false`.
-* `info` (string): A longer string with more details about the slash command's usage.
 * `name`  (string): The name of the slash command.
-* `options` (object): An object of custom options that the developer may wish to use (e.g. in parsing messages).
-* `permissions` (function): A function used to determine whether the user has permission to run the slash command. Accepts a `DiscordInteraction` object.
 * `syntax` (string): A string describing command syntax.
+* `description` (string): A short string for a brief overview of the slash command.
+* `info` (string): A longer string with more details about the slash command's usage.
+* `hidden` (boolean): A boolean for whether you want to hide the slash command in your help functions. Defaults to `false`.
+* `category` (string): A category name, for convenience in organizing slash commands. Defaults to the filename of the module.
+* `enabled` (boolean): Whether the slash command is able to run. Defaults to `true`.
+* `otherPerms` (function): A function used to determine whether the user has permission to run the slash command. Accepts a `DiscordInteraction` object.
+* `permissions` (array of PermissionResolvables): An array that is used to check for a guild member's permissions
+* `options` (object): An object of custom options that the developer may wish to use (e.g. in parsing messages).
+* `ownerOnly` (boolean): Whether or not the bot owner is the only user allowed to run the slash command. Defaults to `false`.
+* `guildOnly` (boolean): Determines if the slash command should only run when used in a guild or not. Defaults to `false`.
+* `dmOnly` (boolean): Determines if the slash command should only run when used in a DM or not. Defaults to `false`.
+* `process` (function): Required. The function to run when the slash command is invoked. This accepts a DiscordInteraction object.
 
 ### Initialization
 The `.setInit(data)` method accepts a function to run on module initialization. The `data` parameter will have a `null` value on the first run, and will contain the returned by the function defined with the `.setUnload()` method on subsequent reloads of the module.
