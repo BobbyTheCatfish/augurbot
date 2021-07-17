@@ -718,23 +718,23 @@ class AugurModule {
     syntax: String,
     description: String,
     info: String,
-    hidden: Boolean,
+    hidden: Boolean (false),
     category: String,
-    enabled: Boolean,
+    enabled: Boolean (true),
     otherPerms: Function,
     permissions: Array,
     parseParams: Function,
     options: Object,
-    ownerOnly: Boolean,
-    guildOnly: Boolean,
-    dmOnly: Boolean,
-    process: Function
+    process: Function,
+    onlyOwner: Boolean (false),
+    onlyGuild: Boolean (false),
+    onlyDm: Boolean (false)
   }) {
     this.commands.push(new AugurCommand(info, this.client));
     return this;
   }
 
-  addEvent(name, handler) {
+  addEvent(name = String, handler = Function) {
     this.events.set(name, handler);
     return this;
   }
@@ -745,16 +745,16 @@ class AugurModule {
     syntax: String,
     description: String,
     info: String,
-    hidden: Boolean,
+    hidden: Boolean (false),
     category: String,
-    enabled: Boolean,
+    enabled: Boolean (true),
     options: Object,
     otherPerms: Function,
     permissions: Array,
     process: Function,
-    ownerOnly: Boolean,
-    guildOnly: Boolean,
-    dmOnly: Boolean,
+    onlyOwner: Boolean (false),
+    onlyGuild: Boolean (false),
+    onlyDm: Boolean (false)
   }) {
     this.interactions.push(new AugurInteractionCommand(info, this.client));
     return this;
@@ -798,9 +798,9 @@ class AugurCommand {
     this.parseParams = info.parseParams ?? false;
     this.options = info.options ?? {};
     this.process = info.process;
-    this.ownerOnly = info.ownerOnly || false;
-    this.guildOnly = info.guildOnly || false;
-    this.dmOnly = info.dmOnly || false;
+    this.onlyOwner = info.onlyOwner || false;
+    this.onlyGuild = info.onlyGuild || false;
+    this.onlyDm = info.onlyDm || false;
 
     this.client = client;
   }
@@ -808,9 +808,9 @@ class AugurCommand {
   async execute(msg, args) {
     try {
       if(!this.enabled) return
-      else if(this.ownerOnly && msg.author.id != msg.client.config.ownerId) return;
-      else if(this.guildOnly && !msg.guild) return msg.channel.send(`That command can only be used in a server.`).then(m => u.clean([msg, m]));
-      else if(this.dmOnly && msg.guild) return msg.channel.send(`That command can only be used in a DM`).then(m => u.clean([msg, m]));
+      else if(this.onlyOwner && msg.author.id != msg.client.config.ownerId) return;
+      else if(this.onlyGuild && !msg.guild) return msg.channel.send(`That command can only be used in a server.`).then(m => u.clean([msg, m]));
+      else if(this.onlyDm && msg.guild) return msg.channel.send(`That command can only be used in a DM`).then(m => u.clean([msg, m]));
       else if(msg.guild ? !msg.member.hasPermission(this.permissions) : false) return msg.channel.send(`You don't have permission to use that command!`)
       else if (await this.otherPerms(msg)) return await this.process(msg, args);
       else return;
@@ -838,9 +838,9 @@ class AugurInteractionCommand {
     this.otherPerms = info.other || (() => true);
     this.permissions = info.permissions;
     this.process = info.process;
-    this.ownerOnly = info.ownerOnly || false;
-    this.guildOnly = info.guildOnly || false;
-    this.dmOnly = info.dmOnly || false;
+    this.onlyOwner = info.onlyOwner || false;
+    this.onlyGuild = info.onlyGuild || false;
+    this.onlyDm = info.onlyDm || false;
 
     this.client = client;
   }
@@ -848,13 +848,13 @@ class AugurInteractionCommand {
   async execute(interaction) {
     try {
       if(!this.enabled) return
-      else if(this.ownerOnly && interaction.author.id != this.client.config.ownerId) return;
-      else if(this.guildOnly && !interaction.guild) return interaction.createResponse(`That command can only be used in a server.`).then(u.clean());
-      else if(this.dmOnly && interaction.guild) return interaction.createResponse(`That command can only be used in a DM`).then(u.clean);
+      else if(this.onlyOwner && interaction.author.id != this.client.config.ownerId) return;
+      else if(this.onlyGuild && !interaction.guild) return interaction.createResponse(`That command can only be used in a server.`).then(u.clean());
+      else if(this.onlyDm && interaction.guild) return interaction.createResponse(`That command can only be used in a DM`).then(u.clean);
       else if(interaction.guild ? !interaction.member.hasPermission(this.permissions) : false) return interaction.createResponse(`You don't have permission to use that command!`)
       else if (await this.otherPerms(interaction)) return await this.process(interaction);
       if (await this.permissions(interaction)) return await this.process(interaction);
-      let msg = await interaction.createResponse("❌");
+      let msg = await interaction.createResponse("âŒ");
       msg.delete(5000).catch(error => this.client.errorHandler(error, "Remove Response After Failed Interaction Permissions Check"));
     } catch(error) {
       if (this.client) this.client.errorHandler(error, msg);
