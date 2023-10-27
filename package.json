@@ -1,5 +1,5 @@
 {
-    "name": "augurbot",
+    "name": "@bobbythecatfish/augurbot",
     "version": "3.0.0",
     "description": "Discord bot framework",
     "main": "dist/augurbot.js",
