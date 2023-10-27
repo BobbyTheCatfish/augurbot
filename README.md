@@ -4,7 +4,20 @@ Augur is a Discord bot framework, utilizing the `discord.js` library.
 
 ### Change Log
 
-As of version 2.3.0, Augur uses Discord.js v12.2 and requires Node 14+.
+As of version 3.0.0, Augur uses Discord.js v14.13 and requires Node 14+.
+
+3.0.0 updated to D.JS v14 and changed quite a few things
+* The project now uses Typescript (can be used with `require()` or `import`
+* All classes, variables, and functions now have correct typings
+* Discord.JS's `client` class has been extended to include AugurClient's properties
+* Removed legacy calls from 2.3.0
+* Added the following as additional verifications for commands
+  * userPermissions
+  * onlyOwner
+  * onlyGuild
+  * onlyDm
+
+# Updated documentation to come!
 
 2.3.0 introduces several new features:
 * AugurCommand.parseParams
@@ -21,7 +34,7 @@ As of version 2.3.0, Augur uses Discord.js v12.2 and requires Node 14+.
 
 ### Installation
 
-`npm install --save augurbot discord.js`
+`npm install --save @bobbythecatfish/augurbot discord.js`
 
 ---
 
