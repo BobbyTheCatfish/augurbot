@@ -418,6 +418,7 @@ class AugurClient extends Client {
     utils: any
     applicationId: string
     config: BotConfig
+    db: any
     constructor(config: BotConfig, options: AugurOptions = {}) {
         
         const intents = calculateIntents(config.events, config.processDMs);
