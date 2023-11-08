@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import Discord, { Collection, Client } from 'discord.js';
+import Discord, { Collection, Client, Message } from 'discord.js';
 type parsed = {
     command: string;
     suffix: string;
@@ -53,6 +53,19 @@ declare module 'discord.js' {
         applicationId: string;
     }
 }
+/**
+ ** DEFAULT FUNCTIONS*/
+declare const DEFAULTS: {
+    errorHandler: (error: Error | string, message?: any) => void;
+    parse: (message: Discord.Message) => Promise<{
+        command: string;
+        suffix: string;
+        params: string[];
+    } | null>;
+    commandExecution: (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<void>;
+    interactionExecution: (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<void>;
+    clean: (message: Discord.Message) => Promise<void>;
+};
 /***************
  **  MANAGERS  **
  ***************/
@@ -154,7 +167,7 @@ declare class AugurModule {
     unload?: unload;
     constructor();
     addCommand(info: AugurCommandInfo): this;
-    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => {};
+    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => this;
     addInteraction(info: AugurInteractionCommandInfo): this;
     setClockwork(clockwork: Clockwork): this;
     setInit(init: init): this;
@@ -246,4 +259,4 @@ declare class AugurInteractionCommand {
 /**************
  **  EXPORTS  **
  **************/
-export { AugurClient, AugurCommand, AugurInteractionCommand, AugurModule as Module, AugurModule, ClockworkManager, CommandManager, EventManager, InteractionManager, ModuleManager };
+export { AugurClient, AugurCommand, AugurInteractionCommand, AugurModule as Module, AugurModule, ClockworkManager, CommandManager, EventManager, InteractionManager, ModuleManager, DEFAULTS as defaults };
