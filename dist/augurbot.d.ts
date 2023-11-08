@@ -5,8 +5,11 @@ type parsed = {
     suffix: string;
     params: string[];
 };
-type ErrorHandler = (error: Error | string, msg: Discord.Message | Discord.BaseInteraction | string | Discord.PartialMessage | undefined) => void;
-type parse = (msg: Discord.Message) => parsed | null;
+type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.BaseInteraction | string | Discord.PartialMessage) => void;
+type parse = (message: Discord.Message) => Promise<parsed | null>;
+type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
+type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
+/** Standard configuration for the bot. Can be extended to include more properties of your choice */
 type BotConfig = {
     events: (keyof Discord.ClientEvents)[];
     processDMs: boolean;
@@ -18,21 +21,29 @@ type BotConfig = {
     applicationId?: string;
     prefix?: string;
 };
+/** Options for the client object */
 type AugurOptions = {
     clientOptions?: Discord.ClientOptions;
     errorHandler?: ErrorHandler;
     parse?: parse;
+    commandExecution?: commandExecution;
+    interactionExecution?: interactionExecution;
     utils?: any;
     commands?: string;
 };
-type init = (thing: any) => void;
-type unload = (thing: any) => any;
+/** Function to run on module load */
+type init = (load: any) => void;
+/** Function to run on module unload */
+type unload = () => any;
+/** Function to run a timeout on module load */
 type Clockwork = () => NodeJS.Timeout;
 declare module 'discord.js' {
     interface Client {
         prefix: string;
         errorHandler: ErrorHandler;
         parse: parse;
+        commandExecution: commandExecution;
+        interactionExecution: interactionExecution;
         clockwork: ClockworkManager;
         commands: CommandManager;
         events: EventManager;
@@ -59,7 +70,7 @@ declare class CommandManager extends Collection<string, AugurCommand> {
     aliases: Collection<string, AugurCommand>;
     commandCount: number;
     constructor(client: Discord.Client);
-    execute(msg: Discord.Message, parsed: parsed): Promise<void | Discord.Message<false> | Discord.Message<true>>;
+    execute(message: Discord.Message, parsed: parsed): Promise<void>;
     register(load: {
         file: string;
         filepath: string;
@@ -120,6 +131,8 @@ declare class AugurClient extends Client {
     augurOptions: AugurOptions;
     errorHandler: ErrorHandler;
     parse: parse;
+    commandExecution: commandExecution;
+    interactionExecution: interactionExecution;
     utils: any;
     applicationId: string;
     config: BotConfig;
@@ -141,7 +154,7 @@ declare class AugurModule {
     unload?: unload;
     constructor();
     addCommand(info: AugurCommandInfo): this;
-    addEvent(name: keyof Discord.ClientEvents, handler: Function): this;
+    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => {};
     addInteraction(info: AugurInteractionCommandInfo): this;
     setClockwork(clockwork: Clockwork): this;
     setInit(init: init): this;
@@ -160,10 +173,10 @@ type AugurCommandInfo = {
     info: string;
     hidden: boolean;
     enabled: boolean;
-    userPermissions: [];
-    permissions: (msg: Discord.Message) => Promise<boolean>;
-    options: any;
-    process: (msg: Discord.Message, ...args: string[]) => Promise<void>;
+    userPermissions: (Discord.PermissionResolvable)[];
+    permissions: (message: Discord.Message) => Promise<boolean>;
+    options: Object;
+    process: (message: Discord.Message, ...args: string[]) => Promise<void>;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
@@ -180,15 +193,15 @@ declare class AugurCommand {
     info: string;
     hidden: boolean;
     enabled: boolean;
-    userPermissions: [];
-    permissions: (msg: Discord.Message) => Promise<boolean>;
-    options: any;
-    process: (msg: Discord.Message, ...args: string[]) => Promise<void>;
+    userPermissions: (Discord.PermissionResolvable)[];
+    permissions: (message: Discord.Message) => Promise<boolean>;
+    options: Object;
+    process: (message: Discord.Message, ...args: string[]) => Promise<void>;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
     constructor(info: AugurCommandInfo, client: Discord.Client);
-    execute(msg: Discord.Message, args: string[]): Promise<void | Discord.Message<false> | Discord.Message<true>>;
+    execute(message: Discord.Message, args: string[]): Promise<void>;
 }
 type AugurInteractionCommandInfo = {
     id: string;
@@ -200,10 +213,10 @@ type AugurInteractionCommandInfo = {
     hidden: boolean;
     category: string;
     enabled: boolean;
-    options: any;
-    userPermissions: [];
-    validation: (int: Discord.BaseInteraction) => Promise<boolean>;
-    process: (int: Discord.BaseInteraction) => Promise<void>;
+    options: Object;
+    userPermissions: (Discord.PermissionResolvable)[];
+    validation: (interaction: Discord.BaseInteraction) => Promise<boolean>;
+    process: (interaction: Discord.BaseInteraction) => Promise<void>;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
@@ -219,8 +232,8 @@ declare class AugurInteractionCommand {
     hidden: boolean;
     category: string;
     enabled: boolean;
-    options: any;
-    userPermissions: [];
+    options: Object;
+    userPermissions: (Discord.PermissionResolvable)[];
     validation: (int: Discord.BaseInteraction) => Promise<boolean>;
     process: (int: Discord.BaseInteraction) => Promise<void>;
     onlyOwner: boolean;
@@ -233,4 +246,4 @@ declare class AugurInteractionCommand {
 /**************
  **  EXPORTS  **
  **************/
-export { AugurClient, AugurCommand, AugurInteractionCommand, AugurModule as Module, ClockworkManager, CommandManager, EventManager, InteractionManager, ModuleManager };
+export { AugurClient, AugurCommand, AugurInteractionCommand, AugurModule as Module, AugurModule, ClockworkManager, CommandManager, EventManager, InteractionManager, ModuleManager };

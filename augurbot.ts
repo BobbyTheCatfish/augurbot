@@ -14,8 +14,12 @@ type parsed = {
 }
 import calculateIntents from './intents.js'
 
-type ErrorHandler = (error: Error | string, msg: Discord.Message | Discord.BaseInteraction | string | Discord.PartialMessage | undefined) => void;
-type parse = (msg: Discord.Message) => parsed | null;
+type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.BaseInteraction | string | Discord.PartialMessage) => void;
+type parse = (message: Discord.Message) => Promise<parsed | null>;
+type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
+type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
+
+/** Standard configuration for the bot. Can be extended to include more properties of your choice */
 type BotConfig = {
     events: (keyof Discord.ClientEvents)[]
     processDMs: boolean
@@ -26,15 +30,24 @@ type BotConfig = {
     prefix?: string
 }
 
+/** Options for the client object */
 type AugurOptions = {
     clientOptions?: Discord.ClientOptions
     errorHandler?: ErrorHandler
     parse?: parse
+    commandExecution?: commandExecution
+    interactionExecution?: interactionExecution
     utils?: any
     commands?: string
 }
-type init = (thing: any) => void
-type unload = (thing: any) => any
+
+/** Function to run on module load */
+type init = (load: any) => void
+
+/** Function to run on module unload */
+type unload = () => any
+
+/** Function to run a timeout on module load */
 type Clockwork = () => NodeJS.Timeout
 
 declare module 'discord.js' {
@@ -42,6 +55,8 @@ declare module 'discord.js' {
         prefix: string;
         errorHandler: ErrorHandler
         parse: parse
+        commandExecution: commandExecution;
+        interactionExecution: interactionExecution;
         clockwork: ClockworkManager;
         commands: CommandManager;
         events: EventManager;
@@ -52,28 +67,27 @@ declare module 'discord.js' {
     }
 }
 
-/************************
- **  DEFAULT FUNCTIONS  **
- ************************/
+/** 
+ ** DEFAULT FUNCTIONS*/
 
 const DEFAULTS = {
-    errorHandler: (error: Error | string, msg?: any) => {
+    errorHandler: (error: Error | string, message?: any) => {
         console.error(Date());
-        if (msg instanceof Discord.Message) {
-            console.error(`${msg.author.username} in ${(msg.guild ? (`${msg.guild.name} > ${(msg.channel as Discord.GuildChannel).name}`) : "DM")}: ${msg.cleanContent}`);
-        } else if (msg) {
-            console.error(msg);
+        if (message instanceof Discord.Message) {
+            console.error(`${message.author.username} in ${(message.guild ? (`${message.guild.name} > ${(message.channel as Discord.GuildChannel).name}`) : "DM")}: ${message.cleanContent}`);
+        } else if (message) {
+            console.error(message);
         }
         console.error(error);
     },
 
-    parse: (msg: Discord.Message) => {
-        let content = msg.content;
-        let setPrefix = msg.client.prefix || "!"
-        if (msg.author.bot) return null;
-        for (let prefix of [setPrefix, `<@${msg.client.user.id}>`, `<@!${msg.client.user.id}>`]) {
+    parse: async (message: Discord.Message) => {
+        let content = message.content;
+        let setPrefix = message.client.prefix || "!"
+        if (message.author.bot) return null;
+        for (let prefix of [setPrefix, `<@${message.client.user.id}>`, `<@!${message.client.user.id}>`]) {
             if (!content.startsWith(prefix)) continue;
-            let [command, ...params] = content.substr(prefix.length).split(" ");
+            let [command, ...params] = content.substring(prefix.length).split(" ");
             if (command) {
                 return {
                     command: command.toLowerCase(),
@@ -83,6 +97,53 @@ const DEFAULTS = {
             }
         }
         return null;
+    },
+    commandExecution: async (cmd: AugurCommand, message: Discord.Message, args: string[]) => {
+        try {
+            
+            let reply = ""
+            /**Enabled*/ if (!cmd.enabled) return
+            /**Only Owner*/ else if (cmd.onlyOwner && message.author.id != message.client.config.ownerId) return;
+            /**Only Guild*/ else if (cmd.onlyGuild && !message.guild) reply = `That command can only be used in a server.`
+            /**Only DM*/ else if (cmd.onlyDm && message.guild) reply = `That command can only be used in a DM`
+            /**userPermissions*/ else if (cmd.userPermissions?.length > 0 && (message.guild ? !message.member?.permissions.has(cmd.userPermissions, true) : true)) reply = `You don't have permission to use that command!`
+            /**permissions*/ else if (!await cmd.permissions(message)) reply = `You don't have permission to use that command!`
+            if (reply) return message.reply(reply).then(DEFAULTS.clean)
+            else return await cmd.process(message, ...args);
+
+        } catch (error: any) {
+            if (cmd.client) cmd.client.errorHandler(error, message);
+            else console.error(error);
+        }
+    },
+    interactionExecution: async (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => {
+        try {
+            let reply = ""
+            /**Enabled*/ if (!cmd.enabled) return
+            /**Only Owner*/ else if (cmd.onlyOwner && interaction.member?.user.id != cmd.client.config.ownerId) return;
+            /**Only Guild*/ else if (cmd.onlyGuild && !interaction.guild) reply = `That command can only be used in a server.`
+            /**Only DM*/ else if (cmd.onlyDm && interaction.guild) reply = `That command can only be used in a DM`
+            /**userPermissions*/ else if (cmd.userPermissions.length > 0 && (interaction.guild ? !(interaction.member?.permissions as Discord.PermissionsBitField).has(cmd.userPermissions) : true)) reply = `You don't have permission to use that command!`
+            /**permissions*/ else if (!await cmd.validation(interaction)) reply = `You don't have permission to use that command!`
+            
+            if (reply && interaction.isRepliable()) {
+                if (!interaction.replied) interaction.reply({content: reply, ephemeral: true})
+                else interaction.editReply({content: reply})
+            }
+            else return await cmd.process(interaction)
+        } catch (error: any) {
+            if (cmd.client) cmd.client.errorHandler(error, interaction);
+            else console.error(error);
+        }
+    },
+    clean: async (message: Discord.Message) => {
+        setTimeout(() => {
+            try {
+                if (message.deletable) message.delete()
+            } catch (error) {
+                return;
+            }
+        }, 20000)
     }
 };
 
@@ -112,7 +173,6 @@ class ClockworkManager extends Collection<string, NodeJS.Timeout> {
     }
 }
 
-
 class CommandManager extends Collection<string, AugurCommand> {
     client: Discord.Client;
     aliases: Collection<string, AugurCommand>;
@@ -123,7 +183,7 @@ class CommandManager extends Collection<string, AugurCommand> {
         this.aliases = new Collection();
         this.commandCount = 0;
     }
-    async execute(msg: Discord.Message, parsed: parsed) {
+    async execute(message: Discord.Message, parsed: parsed) {
         try {
             let {
                 command,
@@ -138,11 +198,11 @@ class CommandManager extends Collection<string, AugurCommand> {
             this.commandCount++;
             let cmd = commandGroup.get(command);
             if (cmd?.parseParams)
-                return cmd.execute(msg, params);
+                return cmd.execute(message, params);
             else
-                return cmd?.execute(msg, [suffix]);
+                return cmd?.execute(message, [suffix]);
         } catch (error: any) {
-            return this.client.errorHandler(error, msg);
+            return this.client.errorHandler(error, message);
         }
     }
 
@@ -410,15 +470,15 @@ class ModuleManager {
 
 
 class AugurClient extends Client {
-
     moduleHandler: ModuleManager
     augurOptions: AugurOptions
     errorHandler: ErrorHandler
     parse: parse
+    commandExecution: commandExecution
+    interactionExecution: interactionExecution
     utils: any
     applicationId: string
     config: BotConfig
-    db: any
     constructor(config: BotConfig, options: AugurOptions = {}) {
         
         const intents = calculateIntents(config.events, config.processDMs);
@@ -437,6 +497,8 @@ class AugurClient extends Client {
         this.db = (this.config.db?.model ? require(path.resolve((require.main ? path.dirname(require.main.filename) : process.cwd()), this.config.db.model)) : null);
         this.errorHandler = this.augurOptions.errorHandler || DEFAULTS.errorHandler;
         this.parse = this.augurOptions.parse || DEFAULTS.parse;
+        this.commandExecution = this.augurOptions.commandExecution || DEFAULTS.commandExecution
+        this.interactionExecution = this.augurOptions.interactionExecution || DEFAULTS.interactionExecution
         this.utils = this.augurOptions.utils
         this.applicationId = ""
         // PRE-LOAD COMMANDS
@@ -476,71 +538,71 @@ class AugurClient extends Client {
             }
         });
 
-        this.on("messageCreate", async (msg) => {
+        this.on("messageCreate", async (message) => {
             let halt = false;
             if (this.events.has("message")) {
-                if (msg.partial) {
+                if (message.partial) {
                     try {
-                        await msg.fetch();
+                        await message.fetch();
                     } catch (error: any) {
                         this.errorHandler(error, "Augur Fetch Partial Message Error");
                     }
                 }
                 for (let [file, handler] of this.events.get("message") ?? new Collection()) {
                     try {
-                        halt = await handler(msg);
+                        halt = await handler(message);
                         if (halt) break;
                     } catch (error: any) {
-                        this.errorHandler(error, msg);
+                        this.errorHandler(error, message);
                         halt = true;
                         break;
                     }
                 }
             }
             try {
-                let parsed = this.parse(msg);
-                if (parsed && !halt) this.commands.execute(msg, parsed);
+                let parsed = await this.parse(message);
+                if (parsed && !halt) this.commands.execute(message, parsed);
             } catch (error: any) {
-                this.errorHandler(error, msg);
+                this.errorHandler(error, message);
             }
         });
 
-        this.on("messageUpdate", async (old, msg) => {
-            if (old.content === msg.content) return;
+        this.on("messageUpdate", async (old, message) => {
+            if (old.content === message.content) return;
             let halt = false;
             if (this.events.has("messageUpdate")) {
-                if (msg.partial) {
+                if (message.partial) {
                     try {
-                        await msg.fetch();
+                        await message.fetch();
                     } catch (error: any) {
                         return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
                     }
                 }
-                msg = msg as Message
+                message = message as Message
                 for (let [file, handler] of this.events.get("messageUpdate") ?? new Collection()) {
                     try {
-                        halt = await handler(old, msg);
+                        halt = await handler(old, message);
                         if (halt) break;
                     } catch (error: any) {
-                        this.errorHandler(error, msg);
+                        this.errorHandler(error, message);
                         halt = true;
                         break;
                     }
                 }
             }
             try {
-                if (msg.partial) {
+                if (message.partial) {
                     try {
-                        await msg.fetch();
+                        await message.fetch();
                     } catch (error: any) {
                         return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
                     }
                 }
-                msg = msg as Discord.Message
-                let parsed = this.parse(msg);
-                if (parsed && !halt) this.commands.execute(msg, parsed);
+                message = message as Discord.Message
+                let parsed = await this.parse(message);
+                if (parsed && !halt) this.commands.execute(message, parsed);
             } catch (error: any) {
-                this.errorHandler(error, msg);
+                this.errorHandler(error, message);
             }
         });
 
@@ -650,8 +712,9 @@ class AugurModule {
         this.commands.push(new AugurCommand(info, this.client));
         return this;
     }
+    
 
-    addEvent(name: keyof Discord.ClientEvents, handler: Function) {
+    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => {} = (name, handler) => {
         this.events.set(name, handler);
         return this;
     }
@@ -692,10 +755,10 @@ type AugurCommandInfo = {
     info: string
     hidden: boolean
     enabled: boolean
-    userPermissions: []
-    permissions: (msg: Discord.Message) => Promise<boolean>
-    options: any
-    process: (msg: Discord.Message, ...args: string[]) => Promise<void>
+    userPermissions: (Discord.PermissionResolvable)[]
+    permissions: (message: Discord.Message) => Promise<boolean>
+    options: Object
+    process: (message: Discord.Message, ...args: string[]) => Promise<void>
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
@@ -713,10 +776,10 @@ class AugurCommand {
     info: string
     hidden: boolean
     enabled: boolean
-    userPermissions: []
-    permissions: (msg: Discord.Message) => Promise<boolean>
-    options: any
-    process: (msg: Discord.Message, ...args: string[]) => Promise<void>
+    userPermissions: (Discord.PermissionResolvable)[]
+    permissions: (message: Discord.Message) => Promise<boolean>
+    options: Object
+    process: (message: Discord.Message, ...args: string[]) => Promise<void>
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
@@ -733,7 +796,7 @@ class AugurCommand {
         this.hidden = info.hidden ?? false;
         this.category = info.category ?? "General";
         this.enabled = info.enabled ?? true;
-        this.permissions = info.permissions || (async (msg) => true);
+        this.permissions = info.permissions || (async (message) => true);
         this.userPermissions = info.userPermissions;
         this.parseParams = info.parseParams ?? false;
         this.options = info.options ?? {};
@@ -745,19 +808,8 @@ class AugurCommand {
         this.client = client;
     }
 
-    async execute(msg: Discord.Message, args: string[]) {
-        try {
-            if (!this.enabled) return
-            else if (this.onlyOwner && msg.author.id != msg.client.config.ownerId) return;
-            else if (this.onlyGuild && !msg.guild) return msg.channel.send(`That command can only be used in a server.`)
-            else if (this.onlyDm && msg.guild) return msg.channel.send(`That command can only be used in a DM`)
-            else if (this.userPermissions?.length > 0 && (msg.guild ? !msg.member?.permissions.any(this.userPermissions, true) : false)) return msg.channel.send(`You don't have permission to use that command!`)
-            else if (await this.permissions(msg)) return await this.process(msg, ...args);
-            else return;
-        } catch (error: any) {
-            if (this.client) this.client.errorHandler(error, msg);
-            else console.error(error);
-        }
+    async execute(message: Discord.Message, args: string[]) {
+        this.client.commandExecution(this, message, args)
     }
 }
 
@@ -771,10 +823,10 @@ type AugurInteractionCommandInfo = {
     hidden: boolean
     category: string
     enabled: boolean
-    options: any
-    userPermissions: []
-    validation: (int: Discord.BaseInteraction) => Promise<boolean>
-    process: (int: Discord.BaseInteraction) => Promise<void>
+    options: Object
+    userPermissions: (Discord.PermissionResolvable)[]
+    validation: (interaction: Discord.BaseInteraction) => Promise<boolean>
+    process: (interaction: Discord.BaseInteraction) => Promise<void>
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
@@ -791,8 +843,8 @@ class AugurInteractionCommand {
     hidden: boolean
     category: string
     enabled: boolean
-    options: any
-    userPermissions: []
+    options: Object
+    userPermissions: (Discord.PermissionResolvable)[]
     validation: (int: Discord.BaseInteraction) => Promise<boolean>
     process: (int: Discord.BaseInteraction) => Promise<void>
     onlyOwner: boolean
@@ -823,21 +875,7 @@ class AugurInteractionCommand {
     }
 
     async execute(interaction: Discord.BaseInteraction) {
-        try {
-            let reply = ""
-            if (!this.enabled) return
-            else if (this.onlyOwner && interaction.member?.user.id != this.client.config.ownerId) return;
-            else if (this.onlyGuild && !interaction.guild) reply = `That command can only be used in a server.`
-            else if (this.onlyDm && interaction.guild) reply = `That command can only be used in a DM`
-            else if (interaction.guild ? !(interaction.member?.permissions as Discord.PermissionsBitField).any(this.userPermissions) : false) reply = `You don't have permission to use that command!`
-            if (!reply && await this.validation(interaction)) return await this.process(interaction);
-            else if (interaction.isRepliable()) {
-                interaction.reply({content: reply, ephemeral: true})
-            }
-        } catch (error: any) {
-            if (this.client) this.client.errorHandler(error, interaction);
-            else console.error(error);
-        }
+        this.client.interactionExecution(this, interaction)
     }
 }
 
@@ -851,6 +889,7 @@ export {
     AugurCommand,
     AugurInteractionCommand,
     AugurModule as Module,
+    AugurModule,
     ClockworkManager,
     CommandManager,
     EventManager,

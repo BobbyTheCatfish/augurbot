@@ -1,6 +1,6 @@
 {
-    "name": "@bobbythecatfish/augurbot",
-    "version": "3.0.0",
+    "name": "augurbot-ts",
+    "version": "3.0.2",
     "description": "Discord bot framework",
     "main": "dist/augurbot.js",
     "types": "dist/augurbot.d.ts",
