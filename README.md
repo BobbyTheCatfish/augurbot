@@ -381,6 +381,7 @@ Module.addInteraction({AugurInteractionCommandInfo});
 | id | string | ✓ |  | The interaction ID for the interaction command |
 | process | Function ([Discord.BaseInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction)) => void | ✓ |  | The function to run when the command is invoked. |
 | name | string |  |  | The name of the command |
+| interactionType | string |  |  | Sets the type of interaction the command should expect. Only used for type checking while editing. Defaults to using all interaction types if not provided. |
 | syntax | string |  |  | A description of command syntax |
 | description | string |  |  | A short overview of the command |
 | info | string |  |  | A longer description of the command's usage |
