@@ -5,7 +5,7 @@ type parsed = {
     suffix: string;
     params: string[];
 };
-type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.BaseInteraction | string | Discord.PartialMessage) => void;
+type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.PartialMessage | Discord.BaseInteraction | string) => void;
 type parse = (message: Discord.Message) => Promise<parsed | null>;
 type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
 type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
@@ -28,7 +28,6 @@ type AugurOptions = {
     parse?: parse;
     commandExecution?: commandExecution;
     interactionExecution?: interactionExecution;
-    utils?: any;
     commands?: string;
 };
 /** Function to run on module load */
@@ -37,6 +36,23 @@ type init = (load: any) => void;
 type unload = () => any;
 /** Function to run a timeout on module load */
 type Clockwork = () => NodeJS.Timeout;
+type interactionTypes = {
+    AutoComplete: Discord.AutocompleteInteraction;
+    Base: Discord.BaseInteraction;
+    Button: Discord.ButtonInteraction;
+    CommandSlash: Discord.ChatInputCommandInteraction;
+    CommandBase: Discord.CommandInteraction;
+    ContextMessage: Discord.MessageContextMenuCommandInteraction;
+    ContextUser: Discord.UserContextMenuCommandInteraction;
+    ContextBase: Discord.ContextMenuCommandInteraction;
+    MessageComponent: Discord.MessageComponentInteraction;
+    Modal: Discord.ModalSubmitInteraction;
+    SelectMenuChannel: Discord.ChannelSelectMenuInteraction;
+    SelectMenuMentionable: Discord.MentionableSelectMenuInteraction;
+    SelectMenuRole: Discord.RoleSelectMenuInteraction;
+    SelectMenuString: Discord.StringSelectMenuInteraction;
+    SelectMenuUser: Discord.UserSelectMenuInteraction;
+};
 declare module 'discord.js' {
     interface Client {
         prefix: string;
@@ -146,7 +162,6 @@ declare class AugurClient extends Client {
     parse: parse;
     commandExecution: commandExecution;
     interactionExecution: interactionExecution;
-    utils: any;
     applicationId: string;
     config: BotConfig;
     constructor(config: BotConfig, options?: AugurOptions);
@@ -168,7 +183,9 @@ declare class AugurModule {
     constructor();
     addCommand(info: AugurCommandInfo): this;
     addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => this;
-    addInteraction(info: AugurInteractionCommandInfo): this;
+    addInteraction<K extends keyof interactionTypes>(info: AugurInteractionCommandInfo<K> & {
+        interactionType: K;
+    }): this;
     setClockwork(clockwork: Clockwork): this;
     setInit(init: init): this;
     setUnload(unload: unload): this;
@@ -216,23 +233,23 @@ declare class AugurCommand {
     constructor(info: AugurCommandInfo, client: Discord.Client);
     execute(message: Discord.Message, args: string[]): Promise<void>;
 }
-type AugurInteractionCommandInfo = {
+type AugurInteractionCommandInfo<K extends keyof interactionTypes = 'Base'> = {
     id: string;
-    name: string;
+    name?: string;
     guild?: Discord.Guild;
-    syntax: string;
-    description: string;
-    info: string;
-    hidden: boolean;
-    category: string;
-    enabled: boolean;
-    options: Object;
-    userPermissions: (Discord.PermissionResolvable)[];
-    validation: (interaction: Discord.BaseInteraction) => Promise<boolean>;
-    process: (interaction: Discord.BaseInteraction) => Promise<void>;
-    onlyOwner: boolean;
-    onlyGuild: boolean;
-    onlyDm: boolean;
+    syntax?: string;
+    description?: string;
+    info?: string;
+    hidden?: boolean;
+    category?: string;
+    enabled?: boolean;
+    options?: Object;
+    userPermissions?: (Discord.PermissionResolvable)[];
+    permissions?: (interaction: interactionTypes[K]) => Promise<boolean>;
+    process: (interaction: interactionTypes[K]) => Promise<void>;
+    onlyOwner?: boolean;
+    onlyGuild?: boolean;
+    onlyDm?: boolean;
 };
 declare class AugurInteractionCommand {
     file: string;
@@ -247,16 +264,16 @@ declare class AugurInteractionCommand {
     enabled: boolean;
     options: Object;
     userPermissions: (Discord.PermissionResolvable)[];
-    validation: (int: Discord.BaseInteraction) => Promise<boolean>;
+    permissions: (int: Discord.BaseInteraction) => Promise<boolean>;
     process: (int: Discord.BaseInteraction) => Promise<void>;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
     client: Discord.Client;
-    constructor(info: AugurInteractionCommandInfo, client: Discord.Client);
+    constructor(info: AugurInteractionCommandInfo<any>, client: Discord.Client);
     execute(interaction: Discord.BaseInteraction): Promise<void>;
 }
 /**************
  **  EXPORTS  **
  **************/
-export { AugurClient, AugurCommand, AugurInteractionCommand, AugurModule as Module, AugurModule, ClockworkManager, CommandManager, EventManager, InteractionManager, ModuleManager, DEFAULTS as defaults };
+export { AugurClient, AugurModule as Module, DEFAULTS as defaults };

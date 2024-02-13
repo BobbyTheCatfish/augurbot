@@ -14,7 +14,7 @@ type parsed = {
 }
 import calculateIntents from './intents.js'
 
-type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.BaseInteraction | string | Discord.PartialMessage) => void;
+type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.PartialMessage | Discord.BaseInteraction | string ) => void;
 type parse = (message: Discord.Message) => Promise<parsed | null>;
 type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
 type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
@@ -37,7 +37,6 @@ type AugurOptions = {
     parse?: parse
     commandExecution?: commandExecution
     interactionExecution?: interactionExecution
-    utils?: any
     commands?: string
 }
 
@@ -49,6 +48,24 @@ type unload = () => any
 
 /** Function to run a timeout on module load */
 type Clockwork = () => NodeJS.Timeout
+
+type interactionTypes = {
+    AutoComplete: Discord.AutocompleteInteraction
+    Base: Discord.BaseInteraction
+    Button: Discord.ButtonInteraction
+    CommandSlash: Discord.ChatInputCommandInteraction
+    CommandBase: Discord.CommandInteraction
+    ContextMessage: Discord.MessageContextMenuCommandInteraction
+    ContextUser: Discord.UserContextMenuCommandInteraction
+    ContextBase: Discord.ContextMenuCommandInteraction
+    MessageComponent: Discord.MessageComponentInteraction
+    Modal: Discord.ModalSubmitInteraction
+    SelectMenuChannel: Discord.ChannelSelectMenuInteraction
+    SelectMenuMentionable: Discord.MentionableSelectMenuInteraction
+    SelectMenuRole: Discord.RoleSelectMenuInteraction
+    SelectMenuString: Discord.StringSelectMenuInteraction
+    SelectMenuUser: Discord.UserSelectMenuInteraction
+}
 
 declare module 'discord.js' {
     interface Client {
@@ -98,6 +115,7 @@ const DEFAULTS = {
         }
         return null;
     },
+
     commandExecution: async (cmd: AugurCommand, message: Discord.Message, args: string[]) => {
         try {
             
@@ -116,6 +134,7 @@ const DEFAULTS = {
             else console.error(error);
         }
     },
+
     interactionExecution: async (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => {
         try {
             let reply = ""
@@ -124,7 +143,7 @@ const DEFAULTS = {
             /**Only Guild*/ else if (cmd.onlyGuild && !interaction.guild) reply = `That command can only be used in a server.`
             /**Only DM*/ else if (cmd.onlyDm && interaction.guild) reply = `That command can only be used in a DM`
             /**userPermissions*/ else if (cmd.userPermissions.length > 0 && (interaction.guild ? !(interaction.member?.permissions as Discord.PermissionsBitField).has(cmd.userPermissions) : true)) reply = `You don't have permission to use that command!`
-            /**permissions*/ else if (!await cmd.validation(interaction)) reply = `You don't have permission to use that command!`
+            /**permissions*/ else if (!await cmd.permissions(interaction)) reply = `You don't have permission to use that command!`
             
             if (reply && interaction.isRepliable()) {
                 if (!interaction.replied) interaction.reply({content: reply, ephemeral: true})
@@ -136,6 +155,7 @@ const DEFAULTS = {
             else console.error(error);
         }
     },
+    
     clean: async (message: Discord.Message) => {
         setTimeout(() => {
             try {
@@ -185,11 +205,7 @@ class CommandManager extends Collection<string, AugurCommand> {
     }
     async execute(message: Discord.Message, parsed: parsed) {
         try {
-            let {
-                command,
-                suffix,
-                params
-            } = parsed;
+            let { command, suffix, params } = parsed;
             let commandGroup: Collection<string, AugurCommand>;
             if (this.has(command)) commandGroup = this;
             else if (this.aliases.has(command)) commandGroup = this.aliases;
@@ -476,7 +492,6 @@ class AugurClient extends Client {
     parse: parse
     commandExecution: commandExecution
     interactionExecution: interactionExecution
-    utils: any
     applicationId: string
     config: BotConfig
     constructor(config: BotConfig, options: AugurOptions = {}) {
@@ -499,7 +514,6 @@ class AugurClient extends Client {
         this.parse = this.augurOptions.parse || DEFAULTS.parse;
         this.commandExecution = this.augurOptions.commandExecution || DEFAULTS.commandExecution
         this.interactionExecution = this.augurOptions.interactionExecution || DEFAULTS.interactionExecution
-        this.utils = this.augurOptions.utils
         this.applicationId = ""
         // PRE-LOAD COMMANDS
         if (this.augurOptions?.commands) {
@@ -720,7 +734,7 @@ class AugurModule {
     }
 
 
-    addInteraction(info: AugurInteractionCommandInfo) {
+    addInteraction<K extends keyof interactionTypes>(info: AugurInteractionCommandInfo<K> & { interactionType: K }) {
         this.interactions.push(new AugurInteractionCommand(info, this.client));
         return this;
     }
@@ -813,23 +827,23 @@ class AugurCommand {
     }
 }
 
-type AugurInteractionCommandInfo = {
+type AugurInteractionCommandInfo<K extends keyof interactionTypes> = {
     id: string
-    name: string
+    name?: string
     guild?: Discord.Guild
-    syntax: string
-    description: string
-    info: string
-    hidden: boolean
-    category: string
-    enabled: boolean
-    options: Object
-    userPermissions: (Discord.PermissionResolvable)[]
-    validation: (interaction: Discord.BaseInteraction) => Promise<boolean>
-    process: (interaction: Discord.BaseInteraction) => Promise<void>
-    onlyOwner: boolean
-    onlyGuild: boolean
-    onlyDm: boolean
+    syntax?: string
+    description?: string
+    info?: string
+    hidden?: boolean
+    category?: string
+    enabled?: boolean
+    options?: Object
+    userPermissions?: (Discord.PermissionResolvable)[]
+    permissions?: (interaction: interactionTypes[K]) => Promise<boolean>
+    process: (interaction: interactionTypes[K]) => Promise<void>
+    onlyOwner?: boolean
+    onlyGuild?: boolean
+    onlyDm?: boolean
 }
 
 class AugurInteractionCommand {
@@ -845,27 +859,27 @@ class AugurInteractionCommand {
     enabled: boolean
     options: Object
     userPermissions: (Discord.PermissionResolvable)[]
-    validation: (int: Discord.BaseInteraction) => Promise<boolean>
+    permissions: (int: Discord.BaseInteraction) => Promise<boolean>
     process: (int: Discord.BaseInteraction) => Promise<void>
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
     client!: Discord.Client
-    constructor(info: AugurInteractionCommandInfo, client: Discord.Client) {
+    constructor(info: AugurInteractionCommandInfo<any>, client: Discord.Client) {
         if (!info.id || !info.process) {
             throw new Error("Commands must have the `id` and `process` properties");
         }
         this.id = info.id;
-        this.name = info.name;
+        this.name = info.name ?? info.id;
         this.syntax = info.syntax ?? "";
         this.description = info.description ?? `${this.name} ${this.syntax}`.trim();
         this.info = info.info ?? this.description;
         this.hidden = info.hidden ?? false;
-        this.category = info.category;
+        this.category = info.category ?? "";
         this.enabled = info.enabled ?? true;
         this.options = info.options ?? {};
-        this.userPermissions = info.userPermissions;
-        this.validation = info.validation || (async () => true);
+        this.userPermissions = info.userPermissions ?? [];
+        this.permissions = info.permissions || (async () => true);
         this.process = info.process;
         this.onlyOwner = info.onlyOwner || false;
         this.onlyGuild = info.onlyGuild || false;
@@ -886,14 +900,6 @@ class AugurInteractionCommand {
 
 export {
     AugurClient,
-    AugurCommand,
-    AugurInteractionCommand,
     AugurModule as Module,
-    AugurModule,
-    ClockworkManager,
-    CommandManager,
-    EventManager,
-    InteractionManager,
-    ModuleManager,
     DEFAULTS as defaults
 }

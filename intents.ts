@@ -184,7 +184,7 @@ function calcIntent(clientEvents: (keyof ClientEvents)[], dms = true) {
   for (const intent of Intents) {
     if (intent.events.find((e) => clientEvents.includes(e))) intents.push(intent.intent)
   }
-
+  if (!dms) intents.filter(i => ![GatewayIntentBits.DirectMessages, GatewayIntentBits.DirectMessageReactions, GatewayIntentBits.DirectMessageTyping].includes(i))
   return intents
 }
 
