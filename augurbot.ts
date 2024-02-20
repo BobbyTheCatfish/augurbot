@@ -634,7 +634,11 @@ class AugurClient extends Client {
                 }
             }
             try {
-                if (!halt) await this.interactions.get(interaction.id)?.execute(interaction);
+                if (!halt) await this.interactions.get(
+                    interaction.isCommand() ? interaction.commandId
+                    : interaction.isAutocomplete() ? interaction.commandId
+                    : interaction.customId
+                )?.execute(interaction);
             } catch (error: any) {
                 this.errorHandler(error, `Interaction Processing: ${interaction.id}`);
             }
@@ -734,7 +738,7 @@ class AugurModule {
     }
 
 
-    addInteraction<K extends keyof interactionTypes>(info: AugurInteractionCommandInfo<K> & { interactionType: K }) {
+    addInteraction<K extends keyof interactionTypes | undefined>(info: AugurInteractionCommandInfo<K>) {
         this.interactions.push(new AugurInteractionCommand(info, this.client));
         return this;
     }
@@ -827,7 +831,9 @@ class AugurCommand {
     }
 }
 
-type AugurInteractionCommandInfo<K extends keyof interactionTypes> = {
+type DefaultInteraction<A> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash"
+
+type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> = {
     id: string
     name?: string
     guild?: Discord.Guild
@@ -838,9 +844,10 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes> = {
     category?: string
     enabled?: boolean
     options?: Object
+    type?: K
     userPermissions?: (Discord.PermissionResolvable)[]
-    permissions?: (interaction: interactionTypes[K]) => Promise<boolean>
-    process: (interaction: interactionTypes[K]) => Promise<void>
+    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<boolean> | boolean
+    process: (interaction:interactionTypes[DefaultInteraction<K>]) => Promise<void> | void
     onlyOwner?: boolean
     onlyGuild?: boolean
     onlyDm?: boolean
@@ -859,8 +866,8 @@ class AugurInteractionCommand {
     enabled: boolean
     options: Object
     userPermissions: (Discord.PermissionResolvable)[]
-    permissions: (int: Discord.BaseInteraction) => Promise<boolean>
-    process: (int: Discord.BaseInteraction) => Promise<void>
+    permissions: (int: any) => Promise<boolean> | boolean
+    process: (int: any) => Promise<void> | void
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
