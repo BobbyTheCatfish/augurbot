@@ -183,9 +183,7 @@ declare class AugurModule {
     constructor();
     addCommand(info: AugurCommandInfo): this;
     addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => this;
-    addInteraction<K extends keyof interactionTypes>(info: AugurInteractionCommandInfo<K> & {
-        interactionType: K;
-    }): this;
+    addInteraction<K extends keyof interactionTypes | undefined>(info: AugurInteractionCommandInfo<K>): this;
     setClockwork(clockwork: Clockwork): this;
     setInit(init: init): this;
     setUnload(unload: unload): this;
@@ -233,7 +231,8 @@ declare class AugurCommand {
     constructor(info: AugurCommandInfo, client: Discord.Client);
     execute(message: Discord.Message, args: string[]): Promise<void>;
 }
-type AugurInteractionCommandInfo<K extends keyof interactionTypes = 'Base'> = {
+type DefaultInteraction<A> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash";
+type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> = {
     id: string;
     name?: string;
     guild?: Discord.Guild;
@@ -244,9 +243,10 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes = 'Base'> = {
     category?: string;
     enabled?: boolean;
     options?: Object;
+    type?: K;
     userPermissions?: (Discord.PermissionResolvable)[];
-    permissions?: (interaction: interactionTypes[K]) => Promise<boolean>;
-    process: (interaction: interactionTypes[K]) => Promise<void>;
+    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<boolean> | boolean;
+    process: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<void> | void;
     onlyOwner?: boolean;
     onlyGuild?: boolean;
     onlyDm?: boolean;
@@ -264,8 +264,8 @@ declare class AugurInteractionCommand {
     enabled: boolean;
     options: Object;
     userPermissions: (Discord.PermissionResolvable)[];
-    permissions: (int: Discord.BaseInteraction) => Promise<boolean>;
-    process: (int: Discord.BaseInteraction) => Promise<void>;
+    permissions: (int: any) => Promise<boolean> | boolean;
+    process: (int: any) => Promise<void> | void;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
