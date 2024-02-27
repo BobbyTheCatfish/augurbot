@@ -182,7 +182,7 @@ declare class AugurModule {
     unload?: unload;
     constructor();
     addCommand(info: AugurCommandInfo): this;
-    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => this;
+    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any>) => this;
     addInteraction<K extends keyof interactionTypes | undefined>(info: AugurInteractionCommandInfo<K>): this;
     setClockwork(clockwork: Clockwork): this;
     setInit(init: init): this;

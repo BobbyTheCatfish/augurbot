@@ -732,7 +732,7 @@ class AugurModule {
     }
     
 
-    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<void>) => this = (name, handler) => {
+    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any>) => this = (name, handler) => {
         this.events.set(name, handler);
         return this;
     }
