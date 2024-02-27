@@ -774,9 +774,9 @@ type AugurCommandInfo = {
     hidden: boolean
     enabled: boolean
     userPermissions: (Discord.PermissionResolvable)[]
-    permissions: (message: Discord.Message) => Promise<boolean>
+    permissions: (message: Discord.Message) => Promise<any> | any
     options: Object
-    process: (message: Discord.Message, ...args: string[]) => Promise<void>
+    process: (message: Discord.Message, ...args: string[]) => Promise<any> | any
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
@@ -846,8 +846,8 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> =
     options?: Object
     type?: K
     userPermissions?: (Discord.PermissionResolvable)[]
-    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<boolean> | boolean
-    process: (interaction:interactionTypes[DefaultInteraction<K>]) => Promise<void> | void
+    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<any> | any
+    process: (interaction:interactionTypes[DefaultInteraction<K>]) => Promise<any> | any
     onlyOwner?: boolean
     onlyGuild?: boolean
     onlyDm?: boolean
