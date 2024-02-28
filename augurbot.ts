@@ -282,10 +282,11 @@ class InteractionManager extends Collection<string, AugurInteractionCommand> {
         })).data;
     }
 
-    register(load: {interactions: AugurInteractionCommand[], file: string, filepath: string}) {
+    register(load: {interactions: AugurInteractionCommand[], file: string, filepath: string, client: Discord.Client}) {
         for (const interaction of load.interactions) {
             try {
                 interaction.file = load.file;
+                interaction.client = load.client
                 if (this.has(interaction.id)) this.client.errorHandler(`Duplicate Interaction ID: ${interaction.id}`, `Interaction id ${interaction.id} already registered in \`${this.get(interaction.id)?.file}\`. It is being overwritten.`);
                 this.set(interaction.id, interaction);
             } catch (error: any) {
@@ -871,7 +872,7 @@ class AugurInteractionCommand {
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
-    client!: Discord.Client
+    client: Discord.Client
     constructor(info: AugurInteractionCommandInfo<any>, client: Discord.Client) {
         if (!info.id || !info.process) {
             throw new Error("Commands must have the `id` and `process` properties");

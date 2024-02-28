@@ -123,6 +123,7 @@ declare class InteractionManager extends Collection<string, AugurInteractionComm
         interactions: AugurInteractionCommand[];
         file: string;
         filepath: string;
+        client: Discord.Client;
     }): this;
     /*******************************
      **  GLOBAL COMMAND ENDPOINTS  **
