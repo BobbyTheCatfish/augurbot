@@ -79,7 +79,7 @@ declare const DEFAULTS: {
         params: string[];
     } | null>;
     commandExecution: (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<void>;
-    interactionExecution: (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<void>;
+    interactionExecution: (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
     clean: (message: Discord.Message) => Promise<void>;
 };
 /***************
@@ -183,7 +183,7 @@ declare class AugurModule {
     unload?: unload;
     constructor();
     addCommand(info: AugurCommandInfo): this;
-    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any>) => this;
+    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any> | any) => this;
     addInteraction<K extends keyof interactionTypes | undefined>(info: AugurInteractionCommandInfo<K>): this;
     setClockwork(clockwork: Clockwork): this;
     setInit(init: init): this;
@@ -193,22 +193,22 @@ declare class AugurModule {
  **  COMMAND CLASS  **
  ********************/
 type AugurCommandInfo = {
-    parseParams: boolean;
-    category: string;
+    parseParams?: boolean;
+    category?: string;
     name: string;
-    aliases: string[];
-    syntax: string;
-    description: string;
-    info: string;
-    hidden: boolean;
-    enabled: boolean;
-    userPermissions: (Discord.PermissionResolvable)[];
-    permissions: (message: Discord.Message) => Promise<any> | any;
-    options: Object;
+    aliases?: string[];
+    syntax?: string;
+    description?: string;
+    info?: string;
+    hidden?: boolean;
+    enabled?: boolean;
+    userPermissions?: (Discord.PermissionResolvable)[];
+    permissions?: (message: Discord.Message) => Promise<any> | any;
+    options?: Object;
     process: (message: Discord.Message, ...args: string[]) => Promise<any> | any;
-    onlyOwner: boolean;
-    onlyGuild: boolean;
-    onlyDm: boolean;
+    onlyOwner?: boolean;
+    onlyGuild?: boolean;
+    onlyDm?: boolean;
 };
 declare class AugurCommand {
     file: string;
@@ -246,7 +246,7 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> =
     options?: Object;
     type?: K;
     userPermissions?: (Discord.PermissionResolvable)[];
-    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<any> | any;
+    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<boolean> | boolean;
     process: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<any> | any;
     onlyOwner?: boolean;
     onlyGuild?: boolean;
@@ -266,7 +266,7 @@ declare class AugurInteractionCommand {
     options: Object;
     userPermissions: (Discord.PermissionResolvable)[];
     permissions: (int: any) => Promise<boolean> | boolean;
-    process: (int: any) => Promise<void> | void;
+    process: (int: any) => Promise<any> | any;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
