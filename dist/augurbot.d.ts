@@ -12,7 +12,7 @@ type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.
 /** Standard configuration for the bot. Can be extended to include more properties of your choice */
 type BotConfig = {
     events: (keyof Discord.ClientEvents)[];
-    processDMs: boolean;
+    processDMs?: boolean;
     db: {
         model: string;
     };
@@ -20,6 +20,9 @@ type BotConfig = {
     ownerId: string;
     applicationId?: string;
     prefix?: string;
+    strictTypes?: {
+        channels: boolean;
+    };
 };
 /** Options for the client object */
 type AugurOptions = {
@@ -36,23 +39,24 @@ type init = (load: any) => void;
 type unload = () => any;
 /** Function to run a timeout on module load */
 type Clockwork = () => NodeJS.Timeout;
-type interactionTypes = {
-    AutoComplete: Discord.AutocompleteInteraction;
-    Base: Discord.BaseInteraction;
-    Button: Discord.ButtonInteraction;
-    CommandSlash: Discord.ChatInputCommandInteraction;
-    CommandBase: Discord.CommandInteraction;
-    ContextMessage: Discord.MessageContextMenuCommandInteraction;
-    ContextUser: Discord.UserContextMenuCommandInteraction;
-    ContextBase: Discord.ContextMenuCommandInteraction;
-    MessageComponent: Discord.MessageComponentInteraction;
-    Modal: Discord.ModalSubmitInteraction;
-    SelectMenuChannel: Discord.ChannelSelectMenuInteraction;
-    SelectMenuMentionable: Discord.MentionableSelectMenuInteraction;
-    SelectMenuRole: Discord.RoleSelectMenuInteraction;
-    SelectMenuString: Discord.StringSelectMenuInteraction;
-    SelectMenuUser: Discord.UserSelectMenuInteraction;
+type interactionTypes<K extends Discord.CacheType = Discord.CacheType> = {
+    AutoComplete: Discord.AutocompleteInteraction<K>;
+    Base: Discord.BaseInteraction<K>;
+    Button: Discord.ButtonInteraction<K>;
+    CommandSlash: Discord.ChatInputCommandInteraction<K>;
+    CommandBase: Discord.CommandInteraction<K>;
+    ContextMessage: Discord.MessageContextMenuCommandInteraction<K>;
+    ContextUser: Discord.UserContextMenuCommandInteraction<K>;
+    ContextBase: Discord.ContextMenuCommandInteraction<K>;
+    MessageComponent: Discord.MessageComponentInteraction<K>;
+    Modal: Discord.ModalSubmitInteraction<K>;
+    SelectMenuChannel: Discord.ChannelSelectMenuInteraction<K>;
+    SelectMenuMentionable: Discord.MentionableSelectMenuInteraction<K>;
+    SelectMenuRole: Discord.RoleSelectMenuInteraction<K>;
+    SelectMenuString: Discord.StringSelectMenuInteraction<K>;
+    SelectMenuUser: Discord.UserSelectMenuInteraction<K>;
 };
+type GuildInteraction<K extends keyof interactionTypes<"cached">> = interactionTypes<"cached">[K];
 declare module 'discord.js' {
     interface Client {
         prefix: string;
@@ -65,8 +69,20 @@ declare module 'discord.js' {
         events: EventManager;
         interactions: InteractionManager;
         config: BotConfig;
-        db: any;
         applicationId: string;
+        db: any;
+        getTextChannel(id: string): Discord.TextChannel | null;
+        getDmChannel(id: string): Discord.DMChannel | null;
+        getGroupDmChannel(id: string): Discord.PartialGroupDMChannel | null;
+        getVoiceChannel(id: string): Discord.VoiceChannel | null;
+        getCategoryChannel(id: string): Discord.CategoryChannel | null;
+        getNewsChannel(id: string): Discord.NewsChannel | null;
+        getAnnouncementsThread(id: string): Discord.PublicThreadChannel | null;
+        getPublicThread(id: string): Discord.PublicThreadChannel | null;
+        getPrivateThread(id: string): Discord.PrivateThreadChannel | null;
+        getStage(id: string): Discord.StageChannel | null;
+        getDirectory(id: string): Discord.DirectoryChannel | null;
+        getForumChannel(id: string): Discord.ForumChannel | null;
     }
 }
 /**
@@ -153,9 +169,6 @@ declare class ModuleManager {
     unload(file: string): any;
     unloadAll(): this;
 }
-/*******************
- **  AUGUR CLIENT  **
- *******************/
 declare class AugurClient extends Client {
     moduleHandler: ModuleManager;
     augurOptions: AugurOptions;
@@ -165,9 +178,24 @@ declare class AugurClient extends Client {
     interactionExecution: interactionExecution;
     applicationId: string;
     config: BotConfig;
+    db: any;
     constructor(config: BotConfig, options?: AugurOptions);
     destroy(): Promise<void>;
     login(token: string): Promise<string>;
+    private getChannel;
+    wrongTypeErr(id: string, strType: string, expected: string): null;
+    getTextChannel(id: string): Discord.TextChannel | null;
+    getDmChannel(id: string): Discord.DMChannel | null;
+    getGroupDmChannel(id: string): Discord.PartialGroupDMChannel | null;
+    getVoiceChannel(id: string): Discord.VoiceChannel | null;
+    getCategoryChannel(id: string): Discord.CategoryChannel | null;
+    getNewsChannel(id: string): Discord.NewsChannel | null;
+    getAnnouncementsThread(id: string): Discord.PublicThreadChannel<boolean> | null;
+    getPublicThread(id: string): Discord.PublicThreadChannel<boolean> | null;
+    getPrivateThread(id: string): Discord.PrivateThreadChannel | null;
+    getStage(id: string): Discord.StageChannel | null;
+    getDirectory(id: string): Discord.DirectoryChannel | null;
+    getForumChannel(id: string): Discord.ForumChannel | null;
 }
 /***********************
  **  MODULE CONTAINER  **
@@ -204,7 +232,7 @@ type AugurCommandInfo = {
     enabled?: boolean;
     userPermissions?: (Discord.PermissionResolvable)[];
     permissions?: (message: Discord.Message) => Promise<any> | any;
-    options?: Object;
+    options?: any;
     process: (message: Discord.Message, ...args: string[]) => Promise<any> | any;
     onlyOwner?: boolean;
     onlyGuild?: boolean;
@@ -224,7 +252,7 @@ declare class AugurCommand {
     enabled: boolean;
     userPermissions: (Discord.PermissionResolvable)[];
     permissions: (message: Discord.Message) => Promise<boolean>;
-    options: Object;
+    options: any;
     process: (message: Discord.Message, ...args: string[]) => Promise<void>;
     onlyOwner: boolean;
     onlyGuild: boolean;
@@ -277,4 +305,4 @@ declare class AugurInteractionCommand {
 /**************
  **  EXPORTS  **
  **************/
-export { AugurClient, AugurModule as Module, DEFAULTS as defaults };
+export { AugurClient, AugurModule as Module, GuildInteraction, DEFAULTS as defaults };
