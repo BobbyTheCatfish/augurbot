@@ -5,11 +5,12 @@ type parsed = {
     suffix: string;
     params: string[];
 };
-type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.PartialMessage | Discord.BaseInteraction | string) => void;
-type parse = (message: Discord.Message) => Promise<parsed | null>;
-type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
-type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
-/** Standard configuration for the bot. Can be extended to include more properties of your choice */
+type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.BaseInteraction | string) => void;
+type parse = (message: Discord.Message) => Promise<parsed | null> | parsed | null;
+type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any> | any;
+type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any> | any;
+type opBool = boolean | undefined;
+/** Standard configuration for the bot. Can be extended to include more properties of your choice, but that isn't reccomended since you won't get any type support. */
 type BotConfig = {
     events: (keyof Discord.ClientEvents)[];
     processDMs?: boolean;
@@ -24,9 +25,12 @@ type BotConfig = {
         channels: boolean;
     };
 };
+type optionalClientOptions = {
+    intents?: Discord.BitFieldResolvable<Discord.GatewayIntentsString, number>;
+};
 /** Options for the client object */
 type AugurOptions = {
-    clientOptions?: Discord.ClientOptions;
+    clientOptions?: Omit<Discord.ClientOptions, "intents"> & optionalClientOptions;
     errorHandler?: ErrorHandler;
     parse?: parse;
     commandExecution?: commandExecution;
@@ -94,7 +98,7 @@ declare const DEFAULTS: {
         suffix: string;
         params: string[];
     } | null>;
-    commandExecution: (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<void>;
+    commandExecution: (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
     interactionExecution: (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
     clean: (message: Discord.Message) => Promise<void>;
 };
@@ -181,7 +185,7 @@ declare class AugurClient extends Client {
     db: any;
     constructor(config: BotConfig, options?: AugurOptions);
     destroy(): Promise<void>;
-    login(token: string): Promise<string>;
+    login(token?: string): Promise<string>;
     private getChannel;
     wrongTypeErr(id: string, strType: string, expected: string): null;
     getTextChannel(id: string): Discord.TextChannel | null;
@@ -210,17 +214,19 @@ declare class AugurModule {
     init?: init;
     unload?: unload;
     constructor();
-    addCommand(info: AugurCommandInfo): this;
+    addCommand<G extends opBool, D extends opBool>(info: AugurCommandInfo<G, D>): this;
     addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any> | any) => this;
-    addInteraction<K extends keyof interactionTypes | undefined>(info: AugurInteractionCommandInfo<K>): this;
+    addInteraction<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool>(info: AugurInteractionCommandInfo<K, G, D>): this;
     setClockwork(clockwork: Clockwork): this;
     setInit(init: init): this;
     setUnload(unload: unload): this;
 }
+type guildDmMessage<G extends opBool, D extends opBool> = undefined extends G ? undefined extends D ? boolean : true extends D ? false : boolean : true extends G ? true : boolean;
+type guildDmInteraction<G extends opBool, D extends opBool> = guildDmMessage<G, D> extends true ? "cached" : Discord.CacheType;
 /********************
  **  COMMAND CLASS  **
  ********************/
-type AugurCommandInfo = {
+type AugurCommandInfo<G extends opBool, D extends opBool> = {
     parseParams?: boolean;
     category?: string;
     name: string;
@@ -231,12 +237,12 @@ type AugurCommandInfo = {
     hidden?: boolean;
     enabled?: boolean;
     userPermissions?: (Discord.PermissionResolvable)[];
-    permissions?: (message: Discord.Message) => Promise<any> | any;
+    permissions?: (message: Discord.Message<guildDmMessage<G, D>>) => Promise<boolean> | boolean;
     options?: any;
-    process: (message: Discord.Message, ...args: string[]) => Promise<any> | any;
+    process: (message: Discord.Message<guildDmMessage<G, D>>, ...args: string[]) => Promise<any> | any;
     onlyOwner?: boolean;
-    onlyGuild?: boolean;
-    onlyDm?: boolean;
+    onlyGuild?: G;
+    onlyDm?: D;
 };
 declare class AugurCommand {
     file: string;
@@ -251,20 +257,20 @@ declare class AugurCommand {
     hidden: boolean;
     enabled: boolean;
     userPermissions: (Discord.PermissionResolvable)[];
-    permissions: (message: Discord.Message) => Promise<boolean>;
+    permissions: (message: Discord.Message) => Promise<boolean> | boolean;
     options: any;
-    process: (message: Discord.Message, ...args: string[]) => Promise<void>;
+    process: (message: Discord.Message, ...args: string[]) => any;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
-    constructor(info: AugurCommandInfo, client: Discord.Client);
+    constructor(info: AugurCommandInfo<any, any>, client: Discord.Client);
     execute(message: Discord.Message, args: string[]): Promise<void>;
 }
-type DefaultInteraction<A> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash";
-type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> = {
+type DefaultInteraction<A extends keyof interactionTypes | undefined> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash";
+type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool> = {
     id: string;
     name?: string;
-    guild?: Discord.Guild;
+    guildId?: string;
     syntax?: string;
     description?: string;
     info?: string;
@@ -274,17 +280,17 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> =
     options?: Object;
     type?: K;
     userPermissions?: (Discord.PermissionResolvable)[];
-    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<boolean> | boolean;
-    process: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<any> | any;
+    permissions?: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean> | boolean;
+    process: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any;
     onlyOwner?: boolean;
-    onlyGuild?: boolean;
-    onlyDm?: boolean;
+    onlyGuild?: G;
+    onlyDm?: D;
 };
 declare class AugurInteractionCommand {
     file: string;
     id: string;
     name: string;
-    guild?: Discord.Guild;
+    guildId?: string;
     syntax: string;
     description: string;
     info: string;
@@ -299,7 +305,7 @@ declare class AugurInteractionCommand {
     onlyGuild: boolean;
     onlyDm: boolean;
     client: Discord.Client;
-    constructor(info: AugurInteractionCommandInfo<any>, client: Discord.Client);
+    constructor(info: AugurInteractionCommandInfo<any, any, any>, client: Discord.Client);
     execute(interaction: Discord.BaseInteraction): Promise<void>;
 }
 /**************

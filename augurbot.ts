@@ -6,20 +6,21 @@ import Discord, {
 } from 'discord.js'
 import axios from 'axios'
 import path from 'path'
+import calculateIntents from './intents.js'
 
 type parsed = {
     command: string
     suffix: string
     params: string[]
 }
-import calculateIntents from './intents.js'
 
-type ErrorHandler = (error: Error | string, message?: Discord.Message | Discord.PartialMessage | Discord.BaseInteraction | string ) => void;
-type parse = (message: Discord.Message) => Promise<parsed | null>;
-type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
-type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
+type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.BaseInteraction | string ) => void;
+type parse = (message: Discord.Message) => Promise<parsed | null> | parsed | null;
+type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any> | any;
+type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any> | any;
+type opBool = boolean | undefined
 
-/** Standard configuration for the bot. Can be extended to include more properties of your choice */
+/** Standard configuration for the bot. Can be extended to include more properties of your choice, but that isn't reccomended since you won't get any type support. */
 type BotConfig = {
     events: (keyof Discord.ClientEvents)[]
     processDMs?: boolean
@@ -28,12 +29,16 @@ type BotConfig = {
     ownerId: string
     applicationId?: string
     prefix?: string
-    strictTypes?: { channels: boolean }
+    strictTypes?: { channels: boolean };
+}
+
+type optionalClientOptions = {
+    intents?: Discord.BitFieldResolvable<Discord.GatewayIntentsString, number>
 }
 
 /** Options for the client object */
 type AugurOptions = {
-    clientOptions?: Discord.ClientOptions
+    clientOptions?: Omit<Discord.ClientOptions, "intents"> & optionalClientOptions
     errorHandler?: ErrorHandler
     parse?: parse
     commandExecution?: commandExecution
@@ -156,8 +161,9 @@ const DEFAULTS = {
             /**Enabled*/ if (!cmd.enabled) return
             /**Only Owner*/ else if (cmd.onlyOwner && interaction.member?.user.id != cmd.client.config.ownerId) return;
             /**Only Guild*/ else if (cmd.onlyGuild && !interaction.guild) reply = `That command can only be used in a server.`
+            /**Only Specific Guild*/ else if (cmd.guildId && interaction.guild?.id != cmd.guildId) reply = `That command can only be used in a specific server.`
             /**Only DM*/ else if (cmd.onlyDm && interaction.guild) reply = `That command can only be used in a DM`
-            /**userPermissions*/ else if (cmd.userPermissions.length > 0 && (interaction.guild ? !(interaction.member?.permissions as Discord.PermissionsBitField).has(cmd.userPermissions) : true)) reply = `You don't have permission to use that command!`
+            /**userPermissions*/ else if (cmd.userPermissions.length > 0 && (interaction.inGuild() ? !(interaction.member.permissions as Discord.PermissionsBitField).has(cmd.userPermissions) : true)) reply = `You don't have permission to use that command!`
             /**permissions*/ else if (!await cmd.permissions(interaction)) reply = `You don't have permission to use that command!`
             
             if (reply && interaction.isRepliable()) {
@@ -194,7 +200,7 @@ class ClockworkManager extends Collection<string, NodeJS.Timeout> {
         this.client = client;
     }
 
-    register(load: {clockwork: Clockwork, filepath: string}) {
+    register(load: {clockwork?: Clockwork, filepath: string}) {
         if (load.clockwork) this.set(load.filepath, load.clockwork());
         return this;
     }
@@ -305,7 +311,7 @@ class InteractionManager extends Collection<string, AugurInteractionCommand> {
                 if (this.has(interaction.id)) this.client.errorHandler(`Duplicate Interaction ID: ${interaction.id}`, `Interaction id ${interaction.id} already registered in \`${this.get(interaction.id)?.file}\`. It is being overwritten.`);
                 this.set(interaction.id, interaction);
             } catch (error: any) {
-                this.client.errorHandler(error, `Register interaction "${interaction.name}" in guild ${interaction.guild} in ${load.filepath}`);
+                this.client.errorHandler(error, `Register interaction "${interaction.name}" in guild ${interaction.guildId} in ${load.filepath}`);
             }
         }
         return this;
@@ -532,8 +538,8 @@ class AugurClient extends Client {
                 intents
         };
         else if (!options.clientOptions.intents) options.clientOptions.intents = intents
-
-        super(options.clientOptions);
+        
+        super(options.clientOptions as Discord.ClientOptions);
 
         this.moduleHandler = new ModuleManager(this);
 
@@ -729,7 +735,7 @@ class AugurClient extends Client {
         }
         return super.destroy();
     }
-    login(token: string) {
+    login(token?: string) {
         return super.login(token || this.config?.token);
     }
     private getChannel: <A extends keyof Channels>(id: string, type: A, stringType: string) => Channels[A] | null = (id, type, stringType) => {
@@ -799,24 +805,22 @@ class AugurModule {
         this.config = {};
     }
 
-    addCommand(info: AugurCommandInfo) {
+    addCommand<G extends opBool, D extends opBool>(info: AugurCommandInfo<G, D>) {
         this.commands.push(new AugurCommand(info, this.client));
         return this;
     }
     
-
     addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any> | any) => this = (name, handler) => {
         this.events.set(name, handler);
         return this;
     }
 
-
-    addInteraction<K extends keyof interactionTypes | undefined>(info: AugurInteractionCommandInfo<K>) {
+    addInteraction<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool>(info: AugurInteractionCommandInfo<K, G, D>) {
         this.interactions.push(new AugurInteractionCommand(info, this.client));
         return this;
     }
 
-    setClockwork(clockwork: Clockwork) {
+    setClockwork(clockwork: Clockwork | undefined) {
         this.clockwork = clockwork;
         return this;
     }
@@ -832,11 +836,32 @@ class AugurModule {
     }
 }
 
+
+/*
+    Simplified logic for future reference
+    if (undefined == G) {
+        if (undefined == D) return boolean
+        else {
+            if (true == D) return false
+            else return boolean
+        }
+    } else {
+        if (true == D) return true
+        else return boolean
+    }
+*/
+type guildDmMessage <G extends opBool, D extends opBool> = 
+    undefined extends G ? undefined extends D ? boolean :
+    true extends D ? false : boolean :
+    true extends G ? true : boolean
+
+type guildDmInteraction<G extends opBool, D extends opBool> = guildDmMessage<G, D> extends true ? "cached" : Discord.CacheType
+
 /********************
  **  COMMAND CLASS  **
  ********************/
 
-type AugurCommandInfo = {
+type AugurCommandInfo<G extends opBool, D extends opBool> = {
     parseParams?: boolean
     category?: string
     name: string
@@ -847,12 +872,12 @@ type AugurCommandInfo = {
     hidden?: boolean
     enabled?: boolean
     userPermissions?: (Discord.PermissionResolvable)[]
-    permissions?: (message: Discord.Message) => Promise<any> | any
+    permissions?: (message: Discord.Message<guildDmMessage<G,D>>) => Promise<boolean> | boolean
     options?: any
-    process: (message: Discord.Message, ...args: string[]) => Promise<any> | any
+    process: (message: Discord.Message<guildDmMessage<G,D>>, ...args: string[]) => Promise<any> | any
     onlyOwner?: boolean
-    onlyGuild?: boolean
-    onlyDm?: boolean
+    onlyGuild?: G
+    onlyDm?: D
 }
 
 class AugurCommand {
@@ -868,14 +893,14 @@ class AugurCommand {
     hidden: boolean
     enabled: boolean
     userPermissions: (Discord.PermissionResolvable)[]
-    permissions: (message: Discord.Message) => Promise<boolean>
+    permissions: (message: Discord.Message) => Promise<boolean> | boolean
     options: any
-    process: (message: Discord.Message, ...args: string[]) => Promise<void>
+    process: (message: Discord.Message, ...args: string[]) => any
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
 
-    constructor(info: AugurCommandInfo, client: Discord.Client) {
+    constructor(info: AugurCommandInfo<any, any>, client: Discord.Client) {
         if (!info.name || !info.process) {
             throw new Error("Commands must have the `name` and `process` properties");
         }
@@ -895,7 +920,7 @@ class AugurCommand {
         this.onlyOwner = info.onlyOwner || false;
         this.onlyGuild = info.onlyGuild || false;
         this.onlyDm = info.onlyDm || false;
-        this.file = ""
+        this.file = "";
         this.client = client;
     }
 
@@ -904,12 +929,12 @@ class AugurCommand {
     }
 }
 
-type DefaultInteraction<A> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash"
+type DefaultInteraction<A extends keyof interactionTypes | undefined> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash"
 
-type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> = {
+type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool> = {
     id: string
     name?: string
-    guild?: Discord.Guild
+    guildId?: string
     syntax?: string
     description?: string
     info?: string
@@ -919,18 +944,18 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined> =
     options?: Object
     type?: K
     userPermissions?: (Discord.PermissionResolvable)[]
-    permissions?: (interaction: interactionTypes[DefaultInteraction<K>]) => Promise<boolean> | boolean
-    process: (interaction:interactionTypes[DefaultInteraction<K>]) => Promise<any> | any
+    permissions?: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean> | boolean
+    process: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any
     onlyOwner?: boolean
-    onlyGuild?: boolean
-    onlyDm?: boolean
+    onlyGuild?: G
+    onlyDm?: D
 }
 
 class AugurInteractionCommand {
     file: string
     id: string
     name: string
-    guild?: Discord.Guild
+    guildId?: string
     syntax: string
     description: string
     info: string
@@ -945,12 +970,13 @@ class AugurInteractionCommand {
     onlyGuild: boolean
     onlyDm: boolean
     client: Discord.Client
-    constructor(info: AugurInteractionCommandInfo<any>, client: Discord.Client) {
+    constructor(info: AugurInteractionCommandInfo<any, any, any>, client: Discord.Client) {
         if (!info.id || !info.process) {
             throw new Error("Commands must have the `id` and `process` properties");
         }
         this.id = info.id;
         this.name = info.name ?? info.id;
+        this.guildId = info.guildId;
         this.syntax = info.syntax ?? "";
         this.description = info.description ?? `${this.name} ${this.syntax}`.trim();
         this.info = info.info ?? this.description;
@@ -964,7 +990,7 @@ class AugurInteractionCommand {
         this.onlyOwner = info.onlyOwner || false;
         this.onlyGuild = info.onlyGuild || false;
         this.onlyDm = info.onlyDm || false;
-        this.file = ""
+        this.file = "";
         this.client = client;
     }
 
