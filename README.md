@@ -1,4 +1,5 @@
 
+
 <h1  align=center> Augur-TS - Discord bot framework</h1>
 
   
@@ -29,8 +30,17 @@
 <details>
 <summary><h2>Change Log</h2></summary>
 As of version 3.0.0, Augur uses Discord.js v14.13 and requires Node 16+.
+<br/>
+<br/>
+3.1.0 Introduced the following:
 
-  
+* The default type of interactions passed into `Module.addInteraction` functions defaults to `Discord.ChatInputCommandInteraction` instead of all the interaction types.
+
+* `onlyGuild` and `onlyDM` properties in `AugurCommandInfo` and `AugurInteractionCommandInfo` provide type changes for the `process` and `permissions` properties.
+
+* Added `AugurClient.get<Type>Channel` method to get correctly typed channels.
+
+* Introduced `Augur.GuildInteraction<InteractionType>` as a shortcut type for guild based interactions
 
 3.0.0 updated to D.JS v14 and changed quite a few things
 
@@ -65,8 +75,6 @@ As of version 3.0.0, Augur uses Discord.js v14.13 and requires Node 16+.
     *  `onlyDm`: `boolean (false)`
 
 * Added `commandExecution` and `interactionExecution` to `AugurClient`'s options as a way to customize the way message and interaction commands are handled
-
-* Exported additional helpers such as `CommandManager`, `ClockworkManager`, `EventManager`, `InteractionManager`, and `ModuleManager`
   
 
 2.3.0 introduced several new features
@@ -111,13 +119,12 @@ The AugurClient will create the Discord Client, log it in using the token provid
 | PROPERTY | TYPE | REQUIRED | DEFAULT | DESCRIPTION |
 |:---:|:---:|:---:|:---:|---|
 | events | [Discord.ClientEvents](https://old.discordjs.dev/#/docs/discord.js/main/typedef/Events)[] | ✓ |  | An array of discord.js events to process, including `messageCreate` and `messageUpdate`, if your bot will be processing message commands. Gateway intents will be automatically calculated based on the `events` supplied. |
-| ownerId | [Snowflake](https://old.discordjs.dev/#/docs/discord.js/main/typedef/Snowflake) |  |  | The ID of the bot owner, used in the `onlyOwner` property in the command structure |
+| ownerId | [Snowflake](https://old.discordjs.dev/#/docs/discord.js/main/typedef/Snowflake) | ✓ |  | The ID of the bot owner, used in the `onlyOwner` property in the command structure |
 | db | object |  |  | An object, including a `model` property which is the path to your database model, relative to the base file. |
 | prefix | string |  | ! | A default prefix for commands |
 | processDMs | boolean |  | true | Whether to process messages in DMs |
 | token | string |  |  | Your bot's Discord token to log in. If provided in the `config` object, it does not need to be passed to `client.login()`. If omitted, it *must* be passed to `client.login()`. |
-| utils | any |  |  | A set of utilities you would like to access anywhere |
-| ... | any |  |  | Any other properties you wish to be able to access from your command modules may be added |
+| ... | any |  |  | Any other properties you wish to be able to access from your command modules may be added. They will not work with intellisense, so this avoid this if possible. |
 
 
 
@@ -129,10 +136,10 @@ The AugurClient will create the Discord Client, log it in using the token provid
 |:---:|:---:|---|
 | clientOptions | [Discord.ClientOptions](https://old.discordjs.dev/#/docs/discord.js/main/typedef/ClientOptions) | An object containing options to be passed to the new [Discord.Client](https://old.discordjs.dev/#/docs/discord.js/main/class/Client). Gateway intents are automatically calulated based on `config.events`. If you would like to override the calculated intents, provide your own intents as usual for Discord.js |
 | commands | `string` | A directory, relative to the base file, containing any command modules you wish to automatically load. |
-| errorHandler | Function (Error \| string, [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message) \| [Discord.BaseInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction) \| string) => void | A function accepting an `Error` and one of [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message), [Discord.BaseInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction), or `string` as its arguments. This will replace the default error handling function. |
-| parse | Function ([Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message)) => Promise\<{command: string, suffix: string, params: string[]}> | An asynchronous function accepting a [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message) as its argument, returning an object with `command`, `suffix`, and `params` properties. This will replace the default parsing function. (Useful in case different servers use different prefixes, for example. Awaited in the case of a database call) |
-| commandExecution | Function ([AugurCommand](#commands), [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message), string[]) => Promise<[AugurCommand](#commands).process() \| void> | An asynchronous function accepting an `AugurCommand`, `Discord.Message`, and `string[]` (or whatever `parse` is set to export as `params`). This replaces the default execution function and should call `command.process(message, ...params)` |
-| interactionExecution | Function ([AugurInteractionCommand](#interaction-commands), [Discord.BaseInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction)) => Promise<[AugurInteractionCommand](#interaction-commands).process() \| void> | An asynchronous function accepting an `AugurInteractionCommand` and a `Discord.Interaction`. This replaces the default execution function and should call `command.process(interaction)` |
+| errorHandler | Function (Error \| string, [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message) \| [Discord.Interaction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction) \| string) => any \| void | A function accepting an `Error` and one of [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message), [Discord.Interaction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction), or `string` as its arguments. This will replace the default error handling function. |
+| parse | Function ([Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message)) => Promise\<{command: string, suffix: string, params: string[]}\|null> | An asynchronous function accepting a [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message) as its argument, returning an object with `command`, `suffix`, and `params` properties. This will replace the default parsing function. (Useful in case different servers use different prefixes, for example. Awaited in the case of a database call). The function does *not* have to return a promise if you don't need it to. |
+| commandExecution | Function ([AugurCommand](#commands), [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message), string[]) => Promise<[AugurCommand](#commands).process() \| void> | An asynchronous function accepting an `AugurCommand`, `Discord.Message`, and `string[]` (`params`). This replaces the default execution function and should call `command.process(message, ...params)` |
+| interactionExecution | Function ([AugurInteractionCommand](#interaction-commands), [Discord.Interaction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction)) => Promise<[AugurInteractionCommand](#interaction-commands).process() \| void> | An asynchronous function accepting an `AugurInteractionCommand` and a `Discord.Interaction`. This replaces the default execution function and should call `command.process(interaction)` |
 
 <details>
 <summary><h4>Default Client Option Functions (errorHandler, parse, etc)</h4></summary>
@@ -175,46 +182,44 @@ errorHandler: (error, message) => {
 
 ```js
 commandExecution: async (cmd, message, args) => {
-    try {
-        
-        let reply = ""
-        /**Enabled*/ if (!cmd.enabled) return
-        /**Only Owner*/ else if (cmd.onlyOwner && message.author.id != message.client.config.ownerId) return;
-        /**Only Guild*/ else if (cmd.onlyGuild && !message.guild) reply = `That command can only be used in a server.`
-        /**Only DM*/ else if (cmd.onlyDm && message.guild) reply = `That command can only be used in a DM`
-        /**userPermissions*/ else if (cmd.userPermissions?.length > 0 && (message.guild ? !message.member?.permissions.has(cmd.userPermissions, true) : true)) reply = `You don't have permission to use that command!`
-        /**permissions*/ else if (!await cmd.permissions(message)) reply = `You don't have permission to use that command!`
-        if (reply) return message.reply(reply).then(DEFAULTS.clean)
-        else return await cmd.process(message, ...args);
-
-    } catch (error: any) {
-        if (cmd.client) cmd.client.errorHandler(error, message);
-        else console.error(error);
-    }
-},
+try {
+	let reply = ""
+	/**Enabled*/ if (!cmd.enabled) return;
+	/**Only Owner*/ else if (cmd.onlyOwner && message.author.id != message.client.config.ownerId) return;
+	/**Only Guild*/ else if (cmd.onlyGuild && !message.guild) reply = `That command can only be used in a server.`;
+	/**Only DM*/ else if (cmd.onlyDm && message.guild) reply = `That command can only be used in a DM`
+	/**userPermissions*/ else if (cmd.userPermissions?.length > 0 && (message.guild ? !message.member?.permissions.has(cmd.userPermissions, true) : true)) reply = `You don't have permission to use that command!`;
+	/**permissions*/ else if (!await cmd.permissions(message)) reply = `You don't have permission to use that command!`;
+	if (reply) return message.reply(reply).then(DEFAULTS.clean);
+	else return await cmd.process(message, ...args);
+} catch (error: any) {
+	if (cmd.client) cmd.client.errorHandler(error, message);
+	else console.error(error);
+}
 ```
 
 
 ```js
 interactionExecution: async (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => {
-    try {
-        let reply = ""
-        /**Enabled*/ if (!cmd.enabled) return
-        /**Only Owner*/ else if (cmd.onlyOwner && interaction.member?.user.id != cmd.client.config.ownerId) return;
-        /**Only Guild*/ else if (cmd.onlyGuild && !interaction.guild) reply = `That command can only be used in a server.`
-        /**Only DM*/ else if (cmd.onlyDm && interaction.guild) reply = `That command can only be used in a DM`
-        /**userPermissions*/ else if (cmd.userPermissions.length > 0 && (interaction.guild ? !(interaction.member?.permissions).has(cmd.userPermissions) : true)) reply = `You don't have permission to use that command!`
-        /**permissions*/ else if (!await cmd.validation(interaction)) reply = `You don't have permission to use that command!`
-        
-        if (reply && interaction.isRepliable()) {
-            if (!interaction.replied) interaction.reply({content: reply, ephemeral: true})
-            else interaction.editReply({content: reply})
-        }
-        else return await cmd.process(interaction)
-    } catch (error: any) {
-        if (cmd.client) cmd.client.errorHandler(error, interaction);
-        else console.error(error);
-    }
+	try {
+      let reply = ""
+      /**Enabled*/ if (!cmd.enabled) return
+      /**Only Owner*/ else if (cmd.onlyOwner && interaction.member?.user.id != cmd.client.config.ownerId) return;
+      /**Only Guild*/ else if (cmd.onlyGuild && !interaction.guild) reply = `That command can only be used in a server.`
+      /**Only Specific Guild*/ else if (cmd.guildId && interaction.guild?.id != cmd.guildId) reply = `That command can only be used in a specific server.`
+      /**Only DM*/ else if (cmd.onlyDm && interaction.guild) reply = `That command can only be used in a DM`
+      /**userPermissions*/ else if (cmd.userPermissions.length > 0 && (interaction.inGuild() ? !(interaction.member.permissions as Discord.PermissionsBitField).has(cmd.userPermissions) : true)) reply = `You don't have permission to use that command!`
+      /**permissions*/ else if (!await cmd.permissions(interaction)) reply = `You don't have permission to use that command!`
+      
+      if (reply && interaction.isRepliable()) {
+          if (!interaction.replied) interaction.reply({content: reply, ephemeral: true})
+          else interaction.editReply({content: reply})
+      }
+      else return await cmd.process(interaction)
+  } catch (error: any) {
+      if (cmd.client) cmd.client.errorHandler(error, interaction);
+      else console.error(error);
+  }
 }
 ```
 </details>
@@ -224,7 +229,7 @@ Properties of the AugurClient class:
 * [config](#augurclient-config): The `config` object passed to the `AugurClient`.
 * [augurOptions](#augurclient-options-optional): The options object passed to the `AugurClient` upon initialization.
 * `db`: Your loaded database model.
-* [clockwork](#clockwork-manager): A collection of functions to be run by an interval.
+* [clockwork](#clockwork-manager): A collection of functions to be run by an interval, keyed by filepath.
 * [commands](#command-manager): A collection of commands, keyed by command name
 * [events](#event-manager): A collection of event handlers, keyed by event then keyed by filepath.
 * [interactions](#interaction-manager): A collection of interaction event handlers for slash commands, keyed by interaction id.
@@ -238,6 +243,8 @@ Methods of the AugurClient class:
 * [parse](#augurclient-options-optional): Parse a message into its command name and suffix. Returns an object containing `command` (`string`), `suffix` (`string`), and `params` (`string[]`)
 * [commandExecution](#augurclient-options-optional): Handles command execution
 * [interactionExecution](#augurclient-options-optional): Handles interaction execution
+* `get<Type>Channel`: This method has been introduced to help with getting the correct type of channel for intellisense. This can replace the traditional `channels.cache.get()` and returns a channel of the correct type. This can also provide actual type safety, as it will return `null` if the channel type is incorrect.
+
 
 </details>
 
@@ -250,7 +257,7 @@ The basic file structure should look something like this
 
 - index.js
 - config.json (contains your [AugurClient Config](#augurclient-config))
-- ./modules (Also commonly called commands. The name doesn't matter, just make sure it's the same as the `commands` property in your [AugurClient Options](#augurclient-options-optional))
+- ./commands (Also commonly called modules. The name doesn't matter, just make sure it's the same as the `commands` property in your [AugurClient Options](#augurclient-options-optional))
 - - *.js (these are your AugurModule files)
 
 
@@ -344,15 +351,15 @@ Module.addCommand({AugurCommandInfo});
 | description | string |  |  | A short overview of the command |
 | info | string |  |  | A longer description of the command's usage |
 | category | string |  | { The AugurModule filename } | The name of the category the command belongs in. Helpful for sorting/categorizing. |
-| permissions | Function ([Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message)) => boolean |  |  | Used to validate if the command should be run based off of the message or user that triggered the command |
+| permissions | Function ([Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message)) => boolean |  |  | Used to validate if the command should be run based off of the message that triggered the command |
 | userPermissions | [Discord.PermissionResolveable](https://old.discordjs.dev/#/docs/discord.js/main/typedef/PermissionResolvable)[] |  |  | Used to check if the member using the command has the right server permissions |
 | options | Object |  |  | An object of custom options that the developer may wish to use (e.g. in parsing messages) |
 | hidden | boolean |  | false | A helper for hiding commands in your help functions |
 | enabled | boolean |  | true | If set to false, the command will never run |
-| parseParams | boolean |  | false | If set to true, the command suffix will be split by " " before passing the parameters to the `process` function |
+| parseParams | boolean |  | false | If set to true, the command suffix will be split by " " before passing the parameters to the `process` function. |
 | onlyOwner | boolean |  | false | If set to true, only the user with the ID provided under `ownerId` in [AugurClient Config](#augurclient-config) will be able to run the command |
-| onlyGuild | boolean |  | false | If set to true, the command will only be run if called in a server |
-| onlyDm | boolean |  | false | If set to true, the command will only be run if called in a DM with the bot |
+| onlyGuild | boolean |  | false | If set to true, the command will only be run if called in a server. This also changes the type of [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message) to be a server message.|
+| onlyDm | boolean |  | false | If set to true, the command will only be run if called in a DM with the bot. This also changes the type of [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message) to be a DM message. |
 
 ### Events
 
@@ -366,7 +373,7 @@ Module.addEvent("eventName", function(...args) {});
   
 ### Interaction Commands
 
-You can use the functions provided in [InteractionManager](#interaction-manager) to register interaction commands. This section is for handling those interactions.
+Interaction commands have to be registered with the [Discord API](https://discord.com/developers/docs/interactions/application-commands#registering-a-command) before their first use, or after changes. Augurbot does not handle this. [This](https://github.com/LDS-Gamers-Studios/icarus5.5/blob/main/register-commands.js) is the script that Icarus, the main bot that uses this framework, uses to register it's commands.
 
 The `.addInteraction()` method defines an interaction for slash commands.
 
@@ -379,21 +386,20 @@ Module.addInteraction({AugurInteractionCommandInfo});
 | PROPERTY | TYPE | REQUIRED | DEFAULT | DESCRIPTION |
 |:---:|:---:|:---:|:---:|---|
 | id | string | ✓ |  | The interaction ID for the interaction command |
-| process | Function ([Discord.BaseInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction)) => void | ✓ |  | The function to run when the command is invoked. |
+| process | Function ([Discord.ChatInputCommandInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/ChatInputCommandInteraction)) => void | ✓ |  | The function to run when the command is invoked. The type can change to be more specific, depending on the `type` property.|
 | name | string |  |  | The name of the command |
-| interactionType | string |  |  | Sets the type of interaction the command should expect. Only used for type checking while editing. Defaults to using all interaction types if not provided. |
+| type | string |  |  | Sets the type of interaction the command should expect. Only used for type checking and intellisense, and does not provide any actual safety. |
 | syntax | string |  |  | A description of command syntax |
 | description | string |  |  | A short overview of the command |
 | info | string |  |  | A longer description of the command's usage |
 | category | string |  | { The AugurModule filename } | The name of the category the command belongs in. Helpful for sorting/categorizing. |
-| permissions | Function ([Discord.BaseInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction)) => Boolean |  |  | Used to validate if the command should be run based off of the message or user that triggered the command |
+| permissions | Function ([Discord.ChatInputCommandInteraction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction)) => Boolean |  |  | Used to validate if the command should be run based off of the message or user that triggered the command. Typing is also changed by the `type` property. |
 | userPermissions | [Discord.PermissionResolveable](https://old.discordjs.dev/#/docs/discord.js/main/typedef/PermissionResolvable)[] |  |  | Used to check if the member using the command has the right server permissions |
-| options | Object |  |  | An object of custom options that the developer may wish to use (e.g. in parsing messages) |
+| options | Object |  |  | An object of custom options that the developer may wish to use (e.g. in execution) |
 | hidden | boolean |  | false | A helper for hiding commands in your help functions |
 | enabled | boolean |  | true | If set to false, the command will never run |
-| parseParams | boolean |  | false | If set to true, the command suffix will be split by " " before passing the parameters to the `process` function |
 | onlyOwner | boolean |  | false | If set to true, only the user with the ID provided under `ownerId` in [AugurClient Config](#augurclient-config) will be able to run the command |
-| onlyGuild | boolean |  | false | If set to true, the command will only be run if called in a server |
+| onlyGuild | boolean |  | false | If set to true, the command will only be run if called in a server. Sets the type of interaction to be in a guild on top of the provided type. |
 | onlyDm | boolean |  | false | If set to true, the command will only be run if called in a DM with the bot |
 
 ### Initialization
@@ -421,9 +427,9 @@ Module.setUnload(function() {});
 
 <details open>
 <summary><h3>Managers</h3></summary>
+The following aren't exported, but it's useful to know how they work.
 
 ##### Clockwork Manager
-
 *  `register(AugurModule)`: Registers clockwork functions from a Module. Automatically called by `client.moduleHandler.register(AugurModule)`.
 
 *  `unload(filepath)`: Unload a clockwork function from memory. Automatically called by `client.moduleHandler.unload(filepath)`.
@@ -454,21 +460,5 @@ Module.setUnload(function() {});
 
 ##### Interaction Manager
 
-*  `register(AugurModule)` (function): Registers interaction commands from a Module. Automatically called by `client.moduleHandler.register(AugurModule)`.
-
-*  `createGlobalCommand(data)` (function): Registers a new global slash command with Discord.
-
-*  `createGuildCommand(guildId, data)` (function): Registers a new guild slash command with Discord.
-
-*  `deleteGlobalCommand(commandId)` (function): Deletes an existing global slash command with Discord.
-
-*  `deleteGuildCommand(guildId, commandId)` (function): Deletes an existing guild slash command with Discord.
-
-*  `editGlobalCommand(commandId, data)` (function): Edits an existing global slash command with Discord.
-
-*  `editGuildCommand(guildId, commandId, data)` (function): Edits an existing guild slash command with Discord.
-
-*  `getGlobalCommands(commandId)` (function): Fetches an array of all global slash commands (when no `commandId` provided) or a single global slash command (when `commandId` provided).
-
-*  `getGuildCommands(guildId, commandId)` (function): Fetches an array of all guild slash commands (when no `commandId` provided) or a single guild slash command (when `commandId` provided).
-</summary>
+*  `register(AugurModule)`: Registers interaction commands from a Module. Automatically called by `client.moduleHandler.register(AugurModule)`.
+</details>
