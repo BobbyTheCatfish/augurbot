@@ -14,10 +14,10 @@ type parsed = {
     params: string[]
 }
 
-type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.BaseInteraction | string ) => void;
+type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.Interaction | string ) => void;
 type parse = (message: Discord.Message) => Promise<parsed | null> | parsed | null;
 type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any> | any;
-type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any> | any;
+type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.Interaction) => Promise<any> | any;
 type opBool = boolean | undefined
 
 /** Standard configuration for the bot. Can be extended to include more properties of your choice, but that isn't reccomended since you won't get any type support. */
@@ -57,7 +57,7 @@ type Clockwork = () => NodeJS.Timeout
 
 type interactionTypes <K extends Discord.CacheType = Discord.CacheType> = {
     AutoComplete: Discord.AutocompleteInteraction<K>
-    Base: Discord.BaseInteraction<K>
+    Any: Discord.Interaction<K>
     Button: Discord.ButtonInteraction<K>
     CommandSlash: Discord.ChatInputCommandInteraction<K>
     CommandBase: Discord.CommandInteraction<K>
@@ -72,6 +72,8 @@ type interactionTypes <K extends Discord.CacheType = Discord.CacheType> = {
     SelectMenuString: Discord.StringSelectMenuInteraction<K>
     SelectMenuUser: Discord.UserSelectMenuInteraction<K>
 }
+
+type NoAutoComplete <K extends Discord.CacheType = Discord.CacheType> = Omit<interactionTypes<K>, "AutoComplete">
 
 type GuildInteraction <K extends keyof interactionTypes<"cached">> =  interactionTypes<"cached">[K]
 
@@ -155,7 +157,7 @@ const DEFAULTS = {
         }
     },
 
-    interactionExecution: async (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => {
+    interactionExecution: async (cmd: AugurInteractionCommand, interaction: Discord.Interaction) => {
         try {
             let reply = ""
             /**Enabled*/ if (!cmd.enabled) return
@@ -165,12 +167,16 @@ const DEFAULTS = {
             /**Only DM*/ else if (cmd.onlyDm && interaction.guild) reply = `That command can only be used in a DM`
             /**userPermissions*/ else if (cmd.userPermissions.length > 0 && (interaction.inGuild() ? !(interaction.member.permissions as Discord.PermissionsBitField).has(cmd.userPermissions) : true)) reply = `You don't have permission to use that command!`
             /**permissions*/ else if (!await cmd.permissions(interaction)) reply = `You don't have permission to use that command!`
-            
-            if (reply && interaction.isRepliable()) {
-                if (!interaction.replied) interaction.reply({content: reply, ephemeral: true})
-                else interaction.editReply({content: reply})
+            if (interaction.isAutocomplete()) {
+                if (reply) return;
+                else return await cmd.autocomplete(interaction)
+            } else {
+                if (reply) {
+                    if (!interaction.replied && !interaction.deferred) interaction.reply({content: reply, ephemeral: true})
+                    else interaction.editReply({content: reply})
+                }
+                else return await cmd.process(interaction)
             }
-            else return await cmd.process(interaction)
         } catch (error: any) {
             if (cmd.client) cmd.client.errorHandler(error, interaction);
             else console.error(error);
@@ -815,7 +821,7 @@ class AugurModule {
         return this;
     }
 
-    addInteraction<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool>(info: AugurInteractionCommandInfo<K, G, D>) {
+    addInteraction<K extends keyof NoAutoComplete | undefined, G extends opBool, D extends opBool>(info: AugurInteractionCommandInfo<K, G, D>) {
         this.interactions.push(new AugurInteractionCommand(info, this.client));
         return this;
     }
@@ -929,9 +935,9 @@ class AugurCommand {
     }
 }
 
-type DefaultInteraction<A extends keyof interactionTypes | undefined> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash"
+type DefaultInteraction<A extends keyof NoAutoComplete | undefined> = undefined extends A ? "CommandSlash" : A extends keyof NoAutoComplete ? A : "CommandSlash"
 
-type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool> = {
+type AugurInteractionCommandInfo<K extends keyof NoAutoComplete | undefined, G extends opBool, D extends opBool> = {
     id: string
     name?: string
     guildId?: string
@@ -944,8 +950,9 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined, G
     options?: Object
     type?: K
     userPermissions?: (Discord.PermissionResolvable)[]
-    permissions?: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean> | boolean
-    process: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any
+    permissions?: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean> | boolean
+    autocomplete?: (interaction: Discord.AutocompleteInteraction<guildDmInteraction<G, D>>) => Promise<any> | any
+    process: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any
     onlyOwner?: boolean
     onlyGuild?: G
     onlyDm?: D
@@ -966,6 +973,7 @@ class AugurInteractionCommand {
     userPermissions: (Discord.PermissionResolvable)[]
     permissions: (int: any) => Promise<boolean> | boolean
     process: (int: any) => Promise<any> | any
+    autocomplete: (int: Discord.AutocompleteInteraction) => Promise<any> | any
     onlyOwner: boolean
     onlyGuild: boolean
     onlyDm: boolean
@@ -987,6 +995,7 @@ class AugurInteractionCommand {
         this.userPermissions = info.userPermissions ?? [];
         this.permissions = info.permissions || (async () => true);
         this.process = info.process;
+        this.autocomplete = info.autocomplete || (() => {})
         this.onlyOwner = info.onlyOwner || false;
         this.onlyGuild = info.onlyGuild || false;
         this.onlyDm = info.onlyDm || false;
@@ -994,7 +1003,7 @@ class AugurInteractionCommand {
         this.client = client;
     }
 
-    async execute(interaction: Discord.BaseInteraction) {
+    async execute(interaction: Discord.Interaction) {
         this.client.interactionExecution(this, interaction)
     }
 }

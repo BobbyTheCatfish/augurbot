@@ -5,10 +5,10 @@ type parsed = {
     suffix: string;
     params: string[];
 };
-type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.BaseInteraction | string) => void;
+type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.Interaction | string) => void;
 type parse = (message: Discord.Message) => Promise<parsed | null> | parsed | null;
 type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any> | any;
-type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any> | any;
+type interactionExecution = (cmd: AugurInteractionCommand, interaction: Discord.Interaction) => Promise<any> | any;
 type opBool = boolean | undefined;
 /** Standard configuration for the bot. Can be extended to include more properties of your choice, but that isn't reccomended since you won't get any type support. */
 type BotConfig = {
@@ -45,7 +45,7 @@ type unload = () => any;
 type Clockwork = () => NodeJS.Timeout;
 type interactionTypes<K extends Discord.CacheType = Discord.CacheType> = {
     AutoComplete: Discord.AutocompleteInteraction<K>;
-    Base: Discord.BaseInteraction<K>;
+    Any: Discord.Interaction<K>;
     Button: Discord.ButtonInteraction<K>;
     CommandSlash: Discord.ChatInputCommandInteraction<K>;
     CommandBase: Discord.CommandInteraction<K>;
@@ -60,6 +60,7 @@ type interactionTypes<K extends Discord.CacheType = Discord.CacheType> = {
     SelectMenuString: Discord.StringSelectMenuInteraction<K>;
     SelectMenuUser: Discord.UserSelectMenuInteraction<K>;
 };
+type NoAutoComplete<K extends Discord.CacheType = Discord.CacheType> = Omit<interactionTypes<K>, "AutoComplete">;
 type GuildInteraction<K extends keyof interactionTypes<"cached">> = interactionTypes<"cached">[K];
 declare module 'discord.js' {
     interface Client {
@@ -99,7 +100,7 @@ declare const DEFAULTS: {
         params: string[];
     } | null>;
     commandExecution: (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
-    interactionExecution: (cmd: AugurInteractionCommand, interaction: Discord.BaseInteraction) => Promise<any>;
+    interactionExecution: (cmd: AugurInteractionCommand, interaction: Discord.Interaction) => Promise<any>;
     clean: (message: Discord.Message) => Promise<void>;
 };
 /***************
@@ -109,7 +110,7 @@ declare class ClockworkManager extends Collection<string, NodeJS.Timeout> {
     client: Discord.Client;
     constructor(client: Discord.Client);
     register(load: {
-        clockwork: Clockwork;
+        clockwork?: Clockwork;
         filepath: string;
     }): this;
     unload(filepath: string): this;
@@ -216,8 +217,8 @@ declare class AugurModule {
     constructor();
     addCommand<G extends opBool, D extends opBool>(info: AugurCommandInfo<G, D>): this;
     addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any> | any) => this;
-    addInteraction<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool>(info: AugurInteractionCommandInfo<K, G, D>): this;
-    setClockwork(clockwork: Clockwork): this;
+    addInteraction<K extends keyof NoAutoComplete | undefined, G extends opBool, D extends opBool>(info: AugurInteractionCommandInfo<K, G, D>): this;
+    setClockwork(clockwork: Clockwork | undefined): this;
     setInit(init: init): this;
     setUnload(unload: unload): this;
 }
@@ -266,8 +267,8 @@ declare class AugurCommand {
     constructor(info: AugurCommandInfo<any, any>, client: Discord.Client);
     execute(message: Discord.Message, args: string[]): Promise<void>;
 }
-type DefaultInteraction<A extends keyof interactionTypes | undefined> = undefined extends A ? "CommandSlash" : A extends keyof interactionTypes ? A : "CommandSlash";
-type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined, G extends opBool, D extends opBool> = {
+type DefaultInteraction<A extends keyof NoAutoComplete | undefined> = undefined extends A ? "CommandSlash" : A extends keyof NoAutoComplete ? A : "CommandSlash";
+type AugurInteractionCommandInfo<K extends keyof NoAutoComplete | undefined, G extends opBool, D extends opBool> = {
     id: string;
     name?: string;
     guildId?: string;
@@ -280,8 +281,9 @@ type AugurInteractionCommandInfo<K extends keyof interactionTypes | undefined, G
     options?: Object;
     type?: K;
     userPermissions?: (Discord.PermissionResolvable)[];
-    permissions?: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean> | boolean;
-    process: (interaction: interactionTypes<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any;
+    permissions?: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean> | boolean;
+    autocomplete?: (interaction: Discord.AutocompleteInteraction<guildDmInteraction<G, D>>) => Promise<any> | any;
+    process: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any;
     onlyOwner?: boolean;
     onlyGuild?: G;
     onlyDm?: D;
@@ -301,12 +303,13 @@ declare class AugurInteractionCommand {
     userPermissions: (Discord.PermissionResolvable)[];
     permissions: (int: any) => Promise<boolean> | boolean;
     process: (int: any) => Promise<any> | any;
+    autocomplete: (int: Discord.AutocompleteInteraction) => Promise<any> | any;
     onlyOwner: boolean;
     onlyGuild: boolean;
     onlyDm: boolean;
     client: Discord.Client;
     constructor(info: AugurInteractionCommandInfo<any, any, any>, client: Discord.Client);
-    execute(interaction: Discord.BaseInteraction): Promise<void>;
+    execute(interaction: Discord.Interaction): Promise<void>;
 }
 /**************
  **  EXPORTS  **
