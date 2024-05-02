@@ -238,7 +238,7 @@ type AugurCommandInfo<G extends opBool, D extends opBool> = {
     hidden?: boolean;
     enabled?: boolean;
     userPermissions?: (Discord.PermissionResolvable)[];
-    permissions?: (message: Discord.Message<guildDmMessage<G, D>>) => Promise<boolean> | boolean;
+    permissions?: (message: Discord.Message<guildDmMessage<G, D>>) => Promise<boolean | null | undefined> | boolean | null | undefined;
     options?: any;
     process: (message: Discord.Message<guildDmMessage<G, D>>, ...args: string[]) => Promise<any> | any;
     onlyOwner?: boolean;
@@ -258,7 +258,7 @@ declare class AugurCommand {
     hidden: boolean;
     enabled: boolean;
     userPermissions: (Discord.PermissionResolvable)[];
-    permissions: (message: Discord.Message) => Promise<boolean> | boolean;
+    permissions: (message: Discord.Message) => Promise<boolean | null | undefined> | boolean | null | undefined;
     options: any;
     process: (message: Discord.Message, ...args: string[]) => any;
     onlyOwner: boolean;
@@ -281,7 +281,7 @@ type AugurInteractionCommandInfo<K extends keyof NoAutoComplete | undefined, G e
     options?: Object;
     type?: K;
     userPermissions?: (Discord.PermissionResolvable)[];
-    permissions?: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean> | boolean;
+    permissions?: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean | null | undefined> | boolean | null | undefined;
     autocomplete?: (interaction: Discord.AutocompleteInteraction<guildDmInteraction<G, D>>) => Promise<any> | any;
     process: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any;
     onlyOwner?: boolean;
@@ -301,7 +301,7 @@ declare class AugurInteractionCommand {
     enabled: boolean;
     options: Object;
     userPermissions: (Discord.PermissionResolvable)[];
-    permissions: (int: any) => Promise<boolean> | boolean;
+    permissions: (int: any) => Promise<boolean | null | undefined> | boolean | null | undefined;
     process: (int: any) => Promise<any> | any;
     autocomplete: (int: Discord.AutocompleteInteraction) => Promise<any> | any;
     onlyOwner: boolean;
