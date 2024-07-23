@@ -112,6 +112,14 @@ client.login();
 
 The AugurClient will create the Discord Client, log it in using the token provided in `config.token`, listen for events, and process commands. Any gateway intents are automatically calculated based on `config.events`.
 
+Processing Order:
+<br>
+
+0) Bot is actually "ready"
+1) AugurOptions.delayStart is called
+2) Module loading
+3) Ready events are handled
+
 <br>
 
 ### AugurClient Config
@@ -140,6 +148,7 @@ The AugurClient will create the Discord Client, log it in using the token provid
 | parse | Function ([Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message)) => Promise\<{command: string, suffix: string, params: string[]}\|null> | An asynchronous function accepting a [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message) as its argument, returning an object with `command`, `suffix`, and `params` properties. This will replace the default parsing function. (Useful in case different servers use different prefixes, for example. Awaited in the case of a database call). The function does *not* have to return a promise if you don't need it to. |
 | commandExecution | Function ([AugurCommand](#commands), [Discord.Message](https://old.discordjs.dev/#/docs/discord.js/main/class/Message), string[]) => Promise<[AugurCommand](#commands).process() \| void> | An asynchronous function accepting an `AugurCommand`, `Discord.Message`, and `string[]` (`params`). This replaces the default execution function and should call `command.process(message, ...params)` |
 | interactionExecution | Function ([AugurInteractionCommand](#interaction-commands), [Discord.Interaction](https://old.discordjs.dev/#/docs/discord.js/main/class/BaseInteraction)) => Promise<[AugurInteractionCommand](#interaction-commands).process() \| void> | An asynchronous function accepting an `AugurInteractionCommand` and a `Discord.Interaction`. This replaces the default execution function and should call `command.process(interaction)` |
+| delayStart | Function () => Promise\<any> | An asynchronous function that delays module loading. |
 
 <details>
 <summary><h4>Default Client Option Functions (errorHandler, parse, etc)</h4></summary>

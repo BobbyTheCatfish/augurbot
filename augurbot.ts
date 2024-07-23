@@ -564,10 +564,7 @@ class AugurClient extends Client {
         });
 
         await this.delayStart()
-        if (ready) {
-            this.readyEvent()
-        }
-        this.emit("loaded", this)
+
         // PRE-LOAD COMMANDS
         if (this.augurOptions?.commands) {
             let commandPath = path.resolve(require.main ? path.dirname(require.main.filename) : process.cwd(), this.augurOptions.commands);
@@ -584,7 +581,11 @@ class AugurClient extends Client {
                 this.errorHandler(error, `Error loading module names from ${commandPath}`);
             }
         }
-        this.on("loaded", async () => {
+        if (ready) {
+            this.readyEvent()
+        }
+
+        this.on("ready", async () => {
             this.readyEvent()
         })
         
