@@ -1,6 +1,6 @@
 {
     "name": "augurbot-ts",
-    "version": "3.1.0",
+    "version": "3.1.1",
     "description": "Discord bot framework",
     "main": "dist/augurbot.js",
     "types": "dist/augurbot.d.ts",
