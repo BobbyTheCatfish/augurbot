@@ -24,7 +24,7 @@ type opBool = boolean | undefined
 type BotConfig = {
     events: (keyof Discord.ClientEvents)[]
     processDMs?: boolean
-    db: {model: string}
+    db?: {model: string}
     token: string
     ownerId: string
     applicationId?: string
@@ -43,6 +43,7 @@ type AugurOptions = {
     parse?: parse
     commandExecution?: commandExecution
     interactionExecution?: interactionExecution
+    delayStart?: () => Promise<any>
     commands?: string
 }
 
@@ -191,6 +192,10 @@ const DEFAULTS = {
                 return;
             }
         }, 20000)
+    },
+
+    delayStart: async () => {
+        return;
     }
 };
 
@@ -533,30 +538,36 @@ class AugurClient extends Client {
     parse: parse
     commandExecution: commandExecution
     interactionExecution: interactionExecution
+    delayStart: () => Promise<any>
     applicationId: string
     config: BotConfig
     db: any
-    constructor(config: BotConfig, options: AugurOptions = {}) {
-        
-        const intents = calculateIntents(config.events, config.processDMs);
+    private async readyEvent () {
+        console.log(`${this.user?.username} ${(this.shard ? ` Shard ${this.shard.ids} ` : "")}ready at: ${Date()}`);
+        console.log(`Listening to ${this.channels.cache.size} channels in ${this.guilds.cache.size} servers.`);
+        if (this.events.has("ready")) {
+            for (let [file, handler] of this.events.get("ready") ?? new Collection()) {
+                try {
+                    if (await handler()) break;
+                } catch (error: any) {
+                    this.errorHandler(error, `Ready Handler: ${file}`);
+                }
+            }
+        }
+    }
+    private async start() {
+        // SET EVENT HANDLERS
+        let ready = false;
+        this.once("ready", async () => {
+            ready = true;
+            this.applicationId = (await this.application?.fetch())?.id ?? "";
+        });
 
-        if (!options.clientOptions) options.clientOptions = {
-                intents
-        };
-        else if (!options.clientOptions.intents) options.clientOptions.intents = intents
-        
-        super(options.clientOptions as Discord.ClientOptions);
-
-        this.moduleHandler = new ModuleManager(this);
-
-        this.augurOptions = options;
-        this.config = config;
-        this.db = (this.config.db?.model ? require(path.resolve((require.main ? path.dirname(require.main.filename) : process.cwd()), this.config.db.model)) : null);
-        this.errorHandler = this.augurOptions.errorHandler || DEFAULTS.errorHandler;
-        this.parse = this.augurOptions.parse || DEFAULTS.parse;
-        this.commandExecution = this.augurOptions.commandExecution || DEFAULTS.commandExecution
-        this.interactionExecution = this.augurOptions.interactionExecution || DEFAULTS.interactionExecution
-        this.applicationId = ""
+        await this.delayStart()
+        if (ready) {
+            this.readyEvent()
+        }
+        this.emit("loaded", this)
         // PRE-LOAD COMMANDS
         if (this.augurOptions?.commands) {
             let commandPath = path.resolve(require.main ? path.dirname(require.main.filename) : process.cwd(), this.augurOptions.commands);
@@ -573,93 +584,80 @@ class AugurClient extends Client {
                 this.errorHandler(error, `Error loading module names from ${commandPath}`);
             }
         }
-
-        // SET EVENT HANDLERS
-        this.once("ready", async () => {
-            this.applicationId = (await this.application?.fetch())?.id ?? "";
-        });
-
-        this.on("ready", async () => {
-            console.log(`${this.user?.username} ${(this.shard ? ` Shard ${this.shard.ids}` : "")} ready at: ${Date()}`);
-            console.log(`Listening to ${this.channels.cache.size} channels in ${this.guilds.cache.size} servers.`);
-            if (this.events.has("ready")) {
-                for (let [file, handler] of this.events.get("ready") ?? new Collection()) {
-                    try {
-                        if (await handler()) break;
-                    } catch (error: any) {
-                        this.errorHandler(error, `Ready Handler: ${file}`);
+        this.on("loaded", async () => {
+            this.readyEvent()
+        })
+        
+        if (this.config.events.includes("messageCreate")) {
+            this.on("messageCreate", async (message) => {
+                let halt = false;
+                if (this.events.has("message")) {
+                    if (message.partial) {
+                        try {
+                            await message.fetch();
+                        } catch (error: any) {
+                            this.errorHandler(error, "Augur Fetch Partial Message Error");
+                        }
+                    }
+                    for (let [file, handler] of this.events.get("message") ?? new Collection()) {
+                        try {
+                            halt = await handler(message);
+                            if (halt) break;
+                        } catch (error: any) {
+                            this.errorHandler(error, message);
+                            halt = true;
+                            break;
+                        }
                     }
                 }
-            }
-        });
-
-        this.on("messageCreate", async (message) => {
-            let halt = false;
-            if (this.events.has("message")) {
-                if (message.partial) {
-                    try {
-                        await message.fetch();
-                    } catch (error: any) {
-                        this.errorHandler(error, "Augur Fetch Partial Message Error");
+                try {
+                    let parsed = await this.parse(message);
+                    if (parsed && !halt) this.commands.execute(message, parsed);
+                } catch (error: any) {
+                    this.errorHandler(error, message);
+                }
+            });
+        }
+        if (this.config.events.includes("messageUpdate")) {
+            this.on("messageUpdate", async (old, message) => {
+                if (old.content === message.content) return;
+                let halt = false;
+                if (this.events.has("messageUpdate")) {
+                    if (message.partial) {
+                        try {
+                            await message.fetch();
+                        } catch (error: any) {
+                            return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
+                        }
+                    }
+                    message = message as Message
+                    for (let [file, handler] of this.events.get("messageUpdate") ?? new Collection()) {
+                        try {
+                            halt = await handler(old, message);
+                            if (halt) break;
+                        } catch (error: any) {
+                            this.errorHandler(error, message);
+                            halt = true;
+                            break;
+                        }
                     }
                 }
-                for (let [file, handler] of this.events.get("message") ?? new Collection()) {
-                    try {
-                        halt = await handler(message);
-                        if (halt) break;
-                    } catch (error: any) {
-                        this.errorHandler(error, message);
-                        halt = true;
-                        break;
+                try {
+                    if (message.partial) {
+                        try {
+                            await message.fetch();
+                        } catch (error: any) {
+                            return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
+                        }
                     }
+                    message = message as Discord.Message
+                    let parsed = await this.parse(message);
+                    if (parsed && !halt) this.commands.execute(message, parsed);
+                } catch (error: any) {
+                    this.errorHandler(error, message);
                 }
-            }
-            try {
-                let parsed = await this.parse(message);
-                if (parsed && !halt) this.commands.execute(message, parsed);
-            } catch (error: any) {
-                this.errorHandler(error, message);
-            }
-        });
-
-        this.on("messageUpdate", async (old, message) => {
-            if (old.content === message.content) return;
-            let halt = false;
-            if (this.events.has("messageUpdate")) {
-                if (message.partial) {
-                    try {
-                        await message.fetch();
-                    } catch (error: any) {
-                        return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
-                    }
-                }
-                message = message as Message
-                for (let [file, handler] of this.events.get("messageUpdate") ?? new Collection()) {
-                    try {
-                        halt = await handler(old, message);
-                        if (halt) break;
-                    } catch (error: any) {
-                        this.errorHandler(error, message);
-                        halt = true;
-                        break;
-                    }
-                }
-            }
-            try {
-                if (message.partial) {
-                    try {
-                        await message.fetch();
-                    } catch (error: any) {
-                        return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
-                    }
-                }
-                message = message as Discord.Message
-                let parsed = await this.parse(message);
-                if (parsed && !halt) this.commands.execute(message, parsed);
-            } catch (error: any) {
-                this.errorHandler(error, message);
-            }
-        });
+            });
+        }
 
         this.on("interactionCreate", async (interaction) => {
             let halt = false;
@@ -731,7 +729,30 @@ class AugurClient extends Client {
             });
         }
     }
-    
+    constructor(config: BotConfig, options: AugurOptions = {}) {
+        
+        const intents = calculateIntents(config.events, config.processDMs);
+
+        if (!options.clientOptions) options.clientOptions = {
+                intents
+        };
+        else if (!options.clientOptions.intents) options.clientOptions.intents = intents
+        
+        super(options.clientOptions as Discord.ClientOptions);
+
+        this.moduleHandler = new ModuleManager(this);
+
+        this.augurOptions = options;
+        this.config = config;
+        this.db = (this.config.db?.model ? require(path.resolve((require.main ? path.dirname(require.main.filename) : process.cwd()), this.config.db.model)) : null);
+        this.errorHandler = this.augurOptions.errorHandler || DEFAULTS.errorHandler;
+        this.parse = this.augurOptions.parse || DEFAULTS.parse;
+        this.commandExecution = this.augurOptions.commandExecution || DEFAULTS.commandExecution
+        this.interactionExecution = this.augurOptions.interactionExecution || DEFAULTS.interactionExecution
+        this.delayStart = this.augurOptions.delayStart || DEFAULTS.delayStart
+        this.applicationId = ""
+        this.start()
+    }
     
     destroy() {
         try {
@@ -845,14 +866,14 @@ class AugurModule {
 
 /*
     Simplified logic for future reference
-    if (undefined == G) {
-        if (undefined == D) return boolean
+    if (undefined === G) {
+        if (undefined === D) return boolean
         else {
-            if (true == D) return false
+            if (true === D) return false
             else return boolean
         }
     } else {
-        if (true == D) return true
+        if (true === D) return true
         else return boolean
     }
 */

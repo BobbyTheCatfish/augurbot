@@ -14,7 +14,7 @@ type opBool = boolean | undefined;
 type BotConfig = {
     events: (keyof Discord.ClientEvents)[];
     processDMs?: boolean;
-    db: {
+    db?: {
         model: string;
     };
     token: string;
@@ -35,6 +35,7 @@ type AugurOptions = {
     parse?: parse;
     commandExecution?: commandExecution;
     interactionExecution?: interactionExecution;
+    delayStart?: () => Promise<any>;
     commands?: string;
 };
 /** Function to run on module load */
@@ -102,6 +103,7 @@ declare const DEFAULTS: {
     commandExecution: (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any>;
     interactionExecution: (cmd: AugurInteractionCommand, interaction: Discord.Interaction) => Promise<any>;
     clean: (message: Discord.Message) => Promise<void>;
+    delayStart: () => Promise<void>;
 };
 /***************
  **  MANAGERS  **
@@ -181,9 +183,12 @@ declare class AugurClient extends Client {
     parse: parse;
     commandExecution: commandExecution;
     interactionExecution: interactionExecution;
+    delayStart: () => Promise<any>;
     applicationId: string;
     config: BotConfig;
     db: any;
+    private readyEvent;
+    private start;
     constructor(config: BotConfig, options?: AugurOptions);
     destroy(): Promise<void>;
     login(token?: string): Promise<string>;
