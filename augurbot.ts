@@ -568,7 +568,7 @@ class AugurClient extends Client {
             this.applicationId = (await this.application?.fetch())?.id ?? "";
         });
 
-        await this.delayStart()
+        await this.delayStart().catch(error => this.errorHandler(error, "Augur Delay Start Function"))
 
         // PRE-LOAD COMMANDS
         if (this.augurOptions?.commands) {
