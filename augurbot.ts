@@ -638,7 +638,10 @@ class AugurClient extends Client {
                         }
                     }
                     message = message as Message
-                    if ((message.editedTimestamp ?? 0) < Date.now() - 60 * 60 * 1000) halt = true;
+                    if (
+                        (message.editedTimestamp ?? 0) < Date.now() - 60 * 1000 || // embed filtering
+                        (old.pinned != null && old.pinned != message.pinned) // pin filtering
+                    ) halt = true;
                     else for (let [file, handler] of this.events.get("messageEdit") ?? new Collection()) {
                         try {
                             halt = await handler(old, message);
