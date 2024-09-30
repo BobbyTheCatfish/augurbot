@@ -5,6 +5,10 @@ type parsed = {
     suffix: string;
     params: string[];
 };
+type ClientEvents = Omit<Discord.ClientEvents, "messageUpdate"> & {
+    messageUpdate: [oldMessage: Message, newMessage: Message];
+    messageEdit: [oldMessage: Message, newMessage: Message];
+};
 type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.Interaction | string) => void;
 type parse = (message: Discord.Message) => Promise<parsed | null> | parsed | null;
 type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any> | any;
@@ -221,7 +225,7 @@ declare class AugurModule {
     unload?: unload;
     constructor();
     addCommand<G extends opBool, D extends opBool>(info: AugurCommandInfo<G, D>): this;
-    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any> | any) => this;
+    addEvent: <K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => Promise<any> | any) => this;
     addInteraction<K extends keyof NoAutoComplete | undefined, G extends opBool, D extends opBool>(info: AugurInteractionCommandInfo<K, G, D>): this;
     setClockwork(clockwork: Clockwork | undefined): this;
     setInit(init: init): this;

@@ -14,6 +14,11 @@ type parsed = {
     params: string[]
 }
 
+type ClientEvents = Omit<Discord.ClientEvents, "messageUpdate"> & {
+    messageUpdate: [oldMessage: Message, newMessage: Message];
+    messageEdit: [oldMessage: Message, newMessage: Message];
+}
+
 type ErrorHandler = (error: Error | string, message?: Message | Discord.PartialMessage | Discord.Interaction | string ) => void;
 type parse = (message: Discord.Message) => Promise<parsed | null> | parsed | null;
 type commandExecution = (cmd: AugurCommand, message: Discord.Message, args: string[]) => Promise<any> | any;
@@ -611,9 +616,10 @@ class AugurClient extends Client {
                         }
                     }
                 }
+                if (halt) return;
                 try {
                     let parsed = await this.parse(message);
-                    if (parsed && !halt) this.commands.execute(message, parsed);
+                    if (parsed) this.commands.execute(message, parsed);
                 } catch (error: any) {
                     this.errorHandler(error, message);
                 }
@@ -623,7 +629,28 @@ class AugurClient extends Client {
             this.on("messageUpdate", async (old, message) => {
                 if (old.content === message.content) return;
                 let halt = false;
-                if (this.events.has("messageUpdate")) {
+                if (this.events.has("messageEdit")) {
+                    if (message.partial) {
+                        try {
+                            await message.fetch();
+                        } catch(error: any) {
+                            return this.errorHandler(error, "Augur Fetch Partial Message Edit Error");
+                        }
+                    }
+                    message = message as Message
+                    if ((message.editedTimestamp ?? 0) < Date.now() - 60 * 60 * 1000) halt = true;
+                    else for (let [file, handler] of this.events.get("messageEdit") ?? new Collection()) {
+                        try {
+                            halt = await handler(old, message);
+                            if (halt) break;
+                        } catch(error: any) {
+                            this.errorHandler(error, message)
+                            halt = true;
+                            break;
+                        }
+                    }
+                }
+                if (this.events.has("messageUpdate") && !halt) {
                     if (message.partial) {
                         try {
                             await message.fetch();
@@ -643,6 +670,7 @@ class AugurClient extends Client {
                         }
                     }
                 }
+                if (halt) return;
                 try {
                     if (message.partial) {
                         try {
@@ -652,8 +680,8 @@ class AugurClient extends Client {
                         }
                     }
                     message = message as Discord.Message
-                    let parsed = await this.parse(message);
-                    if (parsed && !halt) this.commands.execute(message, parsed);
+                    const parsed = await this.parse(message);
+                    if (parsed) this.commands.execute(message, parsed);
                 } catch (error: any) {
                     this.errorHandler(error, message);
                 }
@@ -838,7 +866,7 @@ class AugurModule {
         return this;
     }
     
-    addEvent: <K extends keyof Discord.ClientEvents>(event: K, listener: (...args: Discord.ClientEvents[K]) => Promise<any> | any) => this = (name, handler) => {
+    addEvent: <K extends keyof ClientEvents>(event: K, listener: (...args: ClientEvents[K]) => Promise<any> | any) => this = (name, handler) => {
         this.events.set(name, handler);
         return this;
     }
