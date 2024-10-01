@@ -627,7 +627,9 @@ class AugurClient extends Client {
         }
         if (this.config.events.includes("messageUpdate")) {
             this.on("messageUpdate", async (old, message) => {
-                if (old.content === message.content) return;
+                const isEdited = (message.editedTimestamp ?? 0) > Date.now() - 60 * 1000 && // filter cdn updates
+                    (old.pinned == null || old.pinned == message.pinned) // filter pins
+
                 let halt = false;
                 if (this.events.has("messageEdit")) {
                     if (message.partial) {
@@ -638,18 +640,16 @@ class AugurClient extends Client {
                         }
                     }
                     message = message as Message
-                    if (
-                        (message.editedTimestamp ?? 0) < Date.now() - 60 * 1000 || // embed filtering
-                        (old.pinned != null && old.pinned != message.pinned) // pin filtering
-                    ) halt = true;
-                    else for (let [file, handler] of this.events.get("messageEdit") ?? new Collection()) {
-                        try {
-                            halt = await handler(old, message);
-                            if (halt) break;
-                        } catch(error: any) {
-                            this.errorHandler(error, message)
-                            halt = true;
-                            break;
+                    if (isEdited) {
+                        for (let [file, handler] of this.events.get("messageEdit") ?? new Collection()) {
+                            try {
+                                halt = await handler(old, message);
+                                if (halt) break;
+                            } catch(error: any) {
+                                this.errorHandler(error, message)
+                                halt = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -673,7 +673,7 @@ class AugurClient extends Client {
                         }
                     }
                 }
-                if (halt) return;
+                if (halt || !isEdited) return;
                 try {
                     if (message.partial) {
                         try {
