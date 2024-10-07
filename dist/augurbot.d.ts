@@ -191,6 +191,8 @@ declare class AugurClient extends Client {
     applicationId: string;
     config: BotConfig;
     db: any;
+    private debug;
+    private log;
     private readyEvent;
     private start;
     constructor(config: BotConfig, options?: AugurOptions);

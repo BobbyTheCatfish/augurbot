@@ -406,20 +406,20 @@ class ModuleManager {
                 load.client = this.client;
                 load.file = filepath;
 
-                // REGISTER COMMANDS & ALIASES
-                this.commands.register(load);
-
+                // RUN INIT()
+                load.init?.(data);
+                
+                // REGISTER CLOCKWORK
+                this.clockwork.register(load);
+                
                 // REGISTER EVENT HANDLERS
                 this.events.register(load);
 
-                // REGISTER CLOCKWORK
-                this.clockwork.register(load);
+                // REGISTER COMMANDS & ALIASES
+                this.commands.register(load);
 
                 // REGISTER INTERACTIONS
                 this.interactions.register(load);
-
-                // RUN INIT()
-                load.init?.(data);
 
                 // REGISTER UNLOAD FUNCTION
                 if (load.unload) this.unloads.set(filepath, load.unload);
@@ -547,9 +547,16 @@ class AugurClient extends Client {
     applicationId: string
     config: BotConfig
     db: any
+    private debug: boolean
+
+    private log(msg: any) {
+        if (this.debug) console.log(msg)
+    }
+
     private async readyEvent () {
         console.log(`${this.user?.username} ${(this.shard ? ` Shard ${this.shard.ids} ` : "")}ready at: ${Date()}`);
         console.log(`Listening to ${this.channels.cache.size} channels in ${this.guilds.cache.size} servers.`);
+        this.log(`events has ready: ${this.events.has("ready")}`)
         if (this.events.has("ready")) {
             for (let [file, handler] of this.events.get("ready") ?? new Collection()) {
                 try {
@@ -560,46 +567,45 @@ class AugurClient extends Client {
             }
         }
     }
+
     private async start() {
-        // SET EVENT HANDLERS
-        let ready = false;
+        // HANDLE INITIALIZATION
+        this.log("Bot started")
         this.once("ready", async () => {
-            ready = true;
+            this.log("Bot is ready")
             this.applicationId = (await this.application?.fetch())?.id ?? "";
+            this.log("Application ID fetched. Delaying augurReady")
+            await this.delayStart().catch(error => this.errorHandler(error, "Augur Delay Start Function"))
+            this.log("Delay complete. Loading modules.")
+            // PRE-LOAD COMMANDS
+            if (this.augurOptions?.commands) {
+                let commandPath = path.resolve(require.main ? path.dirname(require.main.filename) : process.cwd(), this.augurOptions.commands);
+                try {
+                    let commandFiles = fs.readdirSync(commandPath).filter(f => f.endsWith(".js"));
+                    for (let command of commandFiles) {
+                        try {
+                            this.moduleHandler.register(path.resolve(commandPath, command));
+                        } catch (error: any) {
+                            this.errorHandler(error, `Error loading Augur Module ${command}`);
+                        }
+                    }
+                } catch (error: any) {
+                    this.errorHandler(error, `Error loading module names from ${commandPath}`);
+                }
+            }
+            this.log("Augur is Ready")
+            this.readyEvent();
+            this.on("ready", this.readyEvent)
         });
 
-        await this.delayStart().catch(error => this.errorHandler(error, "Augur Delay Start Function"))
-
-        // PRE-LOAD COMMANDS
-        if (this.augurOptions?.commands) {
-            let commandPath = path.resolve(require.main ? path.dirname(require.main.filename) : process.cwd(), this.augurOptions.commands);
-            try {
-                let commandFiles = fs.readdirSync(commandPath).filter(f => f.endsWith(".js"));
-                for (let command of commandFiles) {
-                    try {
-                        this.moduleHandler.register(path.resolve(commandPath, command));
-                    } catch (error: any) {
-                        this.errorHandler(error, `Error loading Augur Module ${command}`);
-                    }
-                }
-            } catch (error: any) {
-                this.errorHandler(error, `Error loading module names from ${commandPath}`);
-            }
-        }
-        if (ready) {
-            this.readyEvent()
-        }
-
-        this.on("ready", async () => {
-            this.readyEvent()
-        })
-        
         if (this.config.events.includes("messageCreate")) {
             this.on("messageCreate", async (message) => {
+                this.log("message creation detected")
                 let halt = false;
                 if (this.events.has("message")) {
                     if (message.partial) {
                         try {
+                            this.log("fetching message")
                             await message.fetch();
                         } catch (error: any) {
                             this.errorHandler(error, "Augur Fetch Partial Message Error");
@@ -615,25 +621,31 @@ class AugurClient extends Client {
                             break;
                         }
                     }
+                    this.log(`message parsing halted: ${Boolean(halt)}`)
                 }
                 if (halt) return;
                 try {
                     let parsed = await this.parse(message);
+                    this.log(`message parsed: ${Boolean(parsed)}`)
                     if (parsed) this.commands.execute(message, parsed);
                 } catch (error: any) {
                     this.errorHandler(error, message);
                 }
             });
         }
+
         if (this.config.events.includes("messageUpdate")) {
             this.on("messageUpdate", async (old, message) => {
+                this.log("messageUpdate detected")
                 const isEdited = (message.editedTimestamp ?? 0) > Date.now() - 60 * 1000 && // filter cdn updates
                     (old.pinned == null || old.pinned == message.pinned) // filter pins
-
+                this.log(`message is edited: ${isEdited}`)
                 let halt = false;
                 if (this.events.has("messageEdit")) {
+                    this.log("message being handled as edited")
                     if (message.partial) {
                         try {
+                            this.log("fetching message")
                             await message.fetch();
                         } catch(error: any) {
                             return this.errorHandler(error, "Augur Fetch Partial Message Edit Error");
@@ -651,11 +663,14 @@ class AugurClient extends Client {
                                 break;
                             }
                         }
+                        this.log(`message parsing halted: ${Boolean(halt)}`)
                     }
                 }
                 if (this.events.has("messageUpdate") && !halt) {
+                    this.log("message being handled as updated")
                     if (message.partial) {
                         try {
+                            this.log("fetching message")
                             await message.fetch();
                         } catch (error: any) {
                             return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
@@ -672,11 +687,13 @@ class AugurClient extends Client {
                             break;
                         }
                     }
+                    this.log(`message parsing halted: ${Boolean(halt)}`)
                 }
                 if (halt || !isEdited) return;
                 try {
                     if (message.partial) {
                         try {
+                            this.log("fetching message")
                             await message.fetch();
                         } catch (error: any) {
                             return this.errorHandler(error, "Augur Fetch Partial Message Update Error");
@@ -684,6 +701,7 @@ class AugurClient extends Client {
                     }
                     message = message as Discord.Message
                     const parsed = await this.parse(message);
+                    this.log(`message parsed: ${Boolean(parsed)}`)
                     if (parsed) this.commands.execute(message, parsed);
                 } catch (error: any) {
                     this.errorHandler(error, message);
@@ -692,6 +710,7 @@ class AugurClient extends Client {
         }
 
         this.on("interactionCreate", async (interaction) => {
+            this.log("interaction creation detected")
             let halt = false;
             if (this.events.has("interactionCreate")) {
                 for (let [file, handler] of this.events.get("interactionCreate") ?? new Collection()) {
@@ -703,8 +722,10 @@ class AugurClient extends Client {
                         break;
                     }
                 }
+                this.log(`interactionCreate handling halted: ${Boolean(halt)}`)
             }
             try {
+                this.log("executing interaction as addInteraction")
                 if (!halt) await this.interactions.get(
                     interaction.isCommand() ? interaction.commandId
                     : interaction.isAutocomplete() ? interaction.commandId
@@ -717,9 +738,11 @@ class AugurClient extends Client {
 
         if (this.config.events.includes("messageReactionAdd")) {
             this.on("messageReactionAdd", async (reaction, user) => {
+                this.log("reactionAdd detected")
                 if ((this.events.get("messageReactionAdd")?.size ?? 0) > 0) {
                     if (reaction.partial) {
                         try {
+                            this.log("fetching reaction")
                             await reaction.fetch();
                         } catch (error: any) {
                             this.errorHandler(error, "Augur Fetch Partial Message Reaction Error");
@@ -727,11 +750,13 @@ class AugurClient extends Client {
                     }
                     if (reaction.message?.partial) {
                         try {
+                            this.log("fetching reaction message")
                             await reaction.message.fetch();
                         } catch (error: any) {
                             this.errorHandler(error, "Augur Fetch Partial Reaction.Message Error");
                         }
                     }
+                    this.log("running all messageReactionAdd handlers")
                     for (let [file, handler] of this.events.get("messageReactionAdd") ?? new Collection()) {
                         try {
                             if (await handler(reaction, user)) break;
@@ -748,7 +773,9 @@ class AugurClient extends Client {
 
         for (let event of events) {
             this.on(event, async (...args) => {
+                this.log(`${event} detected`)
                 if ((this.events.get(event)?.size ?? 0) > 0) {
+                    this.log(`handler(s) for ${event} found, trying now...`)
                     for (let [file, handler] of this.events.get(event) ?? new Collection()) {
                         try {
                             if (await handler(...args)) break;
@@ -783,18 +810,23 @@ class AugurClient extends Client {
         this.interactionExecution = this.augurOptions.interactionExecution || DEFAULTS.interactionExecution
         this.delayStart = this.augurOptions.delayStart || DEFAULTS.delayStart
         this.applicationId = ""
+        this.debug = false
         this.start()
     }
     
     destroy() {
+        this.log("client destroy called")
         try {
             this.moduleHandler.unloadAll()
+            this.log("all modules unloaded")
         } catch (error: any) {
             this.errorHandler(error, "Unload prior to destroying client.");
         }
+        this.log("destroying client")
         return super.destroy();
     }
     login(token?: string) {
+        this.log("logging in")
         return super.login(token || this.config?.token);
     }
     private getChannel: <A extends keyof Channels>(id: string, type: A, stringType: string) => Channels[A] | null = (id, type, stringType) => {
@@ -804,6 +836,7 @@ class AugurClient extends Client {
         return channel as Channels[typeof type]
     }
     wrongTypeErr (id: string, strType: string, expected: string) {
+        this.log("Wrong type error")
         if (this.config.strictTypes?.channels) throw new Error(`Expected a ${expected} channel but got a ${strType} instead. (id: ${id})`)
         else return null;
     }
