@@ -999,7 +999,7 @@ class AugurCommand {
         this.name = info.name;
         this.aliases = info.aliases ?? [];
         this.syntax = info.syntax ?? "";
-        this.description = info.description ?? `${this.name} ${this.syntax}`.trim();
+        this.description = info.description ?? "";
         this.info = info.info ?? this.description;
         this.hidden = info.hidden ?? false;
         this.category = info.category ?? "General";
