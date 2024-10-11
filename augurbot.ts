@@ -1033,7 +1033,7 @@ type AugurInteractionCommandInfo<K extends keyof NoAutoComplete | undefined, G e
     hidden?: boolean
     category?: string
     enabled?: boolean
-    options?: Object
+    options?: any
     type?: K
     userPermissions?: (Discord.PermissionResolvable)[]
     permissions?: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean | null | undefined> | boolean | null | undefined
@@ -1055,7 +1055,8 @@ class AugurInteractionCommand {
     hidden: boolean
     category: string
     enabled: boolean
-    options: Object
+    options: any
+    type: string
     userPermissions: (Discord.PermissionResolvable)[]
     permissions: (int: any) => Promise<boolean | null | undefined> | boolean | null | undefined
     process: (int: any) => Promise<any> | any
@@ -1072,14 +1073,15 @@ class AugurInteractionCommand {
         this.name = info.name ?? info.id;
         this.guildId = info.guildId;
         this.syntax = info.syntax ?? "";
-        this.description = info.description ?? `${this.name} ${this.syntax}`.trim();
+        this.description = info.description ?? "";
         this.info = info.info ?? this.description;
         this.hidden = info.hidden ?? false;
         this.category = info.category ?? "";
         this.enabled = info.enabled ?? true;
         this.options = info.options ?? {};
+        this.type = info.type ?? "CommandSlash"
         this.userPermissions = info.userPermissions ?? [];
-        this.permissions = info.permissions || (async () => true);
+        this.permissions = info.permissions ?? (async () => true);
         this.process = info.process;
         this.autocomplete = info.autocomplete || (() => {})
         this.onlyOwner = info.onlyOwner || false;

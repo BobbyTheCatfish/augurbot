@@ -289,7 +289,7 @@ type AugurInteractionCommandInfo<K extends keyof NoAutoComplete | undefined, G e
     hidden?: boolean;
     category?: string;
     enabled?: boolean;
-    options?: Object;
+    options?: any;
     type?: K;
     userPermissions?: (Discord.PermissionResolvable)[];
     permissions?: (interaction: NoAutoComplete<guildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean | null | undefined> | boolean | null | undefined;
@@ -310,7 +310,8 @@ declare class AugurInteractionCommand {
     hidden: boolean;
     category: string;
     enabled: boolean;
-    options: Object;
+    options: any;
+    type: string;
     userPermissions: (Discord.PermissionResolvable)[];
     permissions: (int: any) => Promise<boolean | null | undefined> | boolean | null | undefined;
     process: (int: any) => Promise<any> | any;
