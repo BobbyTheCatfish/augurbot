@@ -1,0 +1,47 @@
+import Discord from "discord.js";
+import { DefaultInteraction, NoAutoComplete } from "../types/ClientTypes";
+import { GuildDmInteraction, opBool } from "../types/UtilTypes";
+export type AugurInteractionInfo<K extends keyof NoAutoComplete | undefined, G extends opBool, D extends opBool> = {
+    id: string;
+    name?: string;
+    guildId?: string;
+    syntax?: string;
+    description?: string;
+    info?: string;
+    hidden?: boolean;
+    category?: string;
+    enabled?: boolean;
+    options?: any;
+    type?: K;
+    userPermissions?: (Discord.PermissionResolvable)[];
+    permissions?: (interaction: NoAutoComplete<GuildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<boolean | null | undefined> | boolean | null | undefined;
+    autocomplete?: (interaction: Discord.AutocompleteInteraction<GuildDmInteraction<G, D>>) => Promise<any> | any;
+    process: (interaction: NoAutoComplete<GuildDmInteraction<G, D>>[DefaultInteraction<K>]) => Promise<any> | any;
+    onlyOwner?: boolean;
+    onlyGuild?: G;
+    onlyDm?: D;
+};
+export declare class AugurInteraction {
+    filepath: string;
+    id: string;
+    name: string;
+    guildId?: string;
+    syntax: string;
+    description: string;
+    info: string;
+    hidden: boolean;
+    category: string;
+    enabled: boolean;
+    options: any;
+    type: string;
+    userPermissions: (Discord.PermissionResolvable)[];
+    permissions: (int: any) => Promise<boolean | null | undefined> | boolean | null | undefined;
+    process: (int: any) => Promise<any> | any;
+    autocomplete: (int: Discord.AutocompleteInteraction) => Promise<any> | any;
+    onlyOwner: boolean;
+    onlyGuild: boolean;
+    onlyDm: boolean;
+    client: Discord.Client;
+    constructor(info: AugurInteractionInfo<any, any, any>, client: Discord.Client);
+    execute(interaction: Discord.Interaction): Promise<void>;
+}

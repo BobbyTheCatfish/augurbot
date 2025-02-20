@@ -2,8 +2,8 @@
     "name": "augurbot-ts",
     "version": "3.2.2",
     "description": "Discord bot framework",
-    "main": "dist/augurbot.js",
-    "types": "dist/augurbot.d.ts",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "type": "commonjs",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
