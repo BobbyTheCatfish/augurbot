@@ -2,7 +2,7 @@ import Discord from "discord.js"
 import AugurClient from './structures/AugurClient'
 import { AugurModule } from "./structures/AugurModule"
 import ModuleManager from "./managers/Modules"
-import { BotConfig, AugurOptions, CommandExecution, InteractionExecution } from "./types/ClientTypes"
+import { BotConfig, AugurOptions, CommandExecution, InteractionExecution, GuildInteraction } from "./types/ClientTypes"
 import { ErrorHandler, Parsed, ParseFunction } from "./types/UtilTypes"
 import DEFAULTS from "./structures/defaults"
 
@@ -49,5 +49,6 @@ export {
     AugurModule as Module,
     Parsed as parsed,
     BotConfig,
-    DEFAULTS as defaults
+    GuildInteraction,
+    DEFAULTS as defaults,
 }
