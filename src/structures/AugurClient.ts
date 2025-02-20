@@ -119,23 +119,24 @@ export default class AugurClient extends Client {
 
         if (this.config.events.includes("messageCreate")) {
             this.on("messageCreate", async (message) => {
+                if (message.interactionMetadata) {
+                    this.log("interaction message sent")
+                    return;
+                }
                 this.log("message creation detected")
                 let halt = false;
-                if (this.moduleManager.events.has("message")) {
-                    const newMsg = await this.fetchMsg(message);
-                    if (newMsg) message = newMsg;
-                    else return;
-
+                if (this.moduleManager.events.has("messageCreate")) {
                     let i = 0;
-                    const events = Array.from(this.moduleManager.events.get("messageCreate")?.values() ?? []);
+                    const events = Array.from(this.moduleManager.events.get("messageCreate") ?? []);
                     while (i < events.length && !halt) {
+                        const [filepath, handler] = events[i]
+
                         try {
-                            const handler = events[i]
                             halt = await handler(message)
                             i++;
                         } catch (error: any) {
-                            this.errorHandler(error, message);
                             halt = true;
+                            this.errorHandler(error, message);
                             break;
                         }
                     }
@@ -154,6 +155,10 @@ export default class AugurClient extends Client {
 
         if (this.config.events.includes("messageUpdate")) {
             this.on("messageUpdate", async (old, message) => {
+                if (message.interactionMetadata) {
+                    this.log("interaction message edit")
+                    return;
+                }
                 this.log("messageUpdate detected")
                 const isEdited = (message.editedTimestamp ?? 0) > Date.now() - 60 * 1000 && // filter cdn updates
                     (old.pinned == null || old.pinned == message.pinned) // filter pins
@@ -263,7 +268,7 @@ export default class AugurClient extends Client {
                     else return;
                     this.log("running all messageReactionAdd handlers")
                     let i = 0;
-                    const events = Array.from(this.moduleManager.events.get("messageEdit") ?? []);
+                    const events = Array.from(this.moduleManager.events.get("messageReactionAdd") ?? []);
                     while (i < events.length) {
                         const [file, handler] = events[i]
                         try {
@@ -281,6 +286,7 @@ export default class AugurClient extends Client {
         let events = (this.config?.events || [])
             .filter(event => ![
                 "message",
+                "messageCreate",
                 "messageUpdate",
                 "interactionCreate",
                 "messageReactionAdd",
@@ -293,7 +299,7 @@ export default class AugurClient extends Client {
                 if (this.moduleManager.events.has(event)) {
                     this.log(`handler(s) for ${event} found, trying now...`)
                     let i = 0;
-                    const events = Array.from(this.moduleManager.events.get("messageEdit") ?? []);
+                    const events = Array.from(this.moduleManager.events.get(event) ?? []);
                     while (i < events.length) {
                         const [file, handler] = events[i]
                         try {
