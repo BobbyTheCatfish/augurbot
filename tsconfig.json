@@ -114,7 +114,8 @@
   ],
   "exclude": [
     "dist",
-    "node_modules"
+    "node_modules",
+    "src/testing"
   ],
   "watchOptions": {
     // Use native file system events for files and directories

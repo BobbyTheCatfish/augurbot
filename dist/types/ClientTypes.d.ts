@@ -17,6 +17,7 @@ export type BotConfig = {
     strictTypes?: {
         channels: boolean;
     };
+    getMessageContent?: boolean;
 };
 export type OptionalClientOptions = {
     intents?: Discord.BitFieldResolvable<Discord.GatewayIntentsString, number>;
@@ -29,7 +30,9 @@ export type AugurOptions = {
     commandExecution?: CommandExecution;
     interactionExecution?: InteractionExecution;
     delayStart?: () => Promise<any>;
-    /** @deprecated Use `modules` instead */
+    /**
+     * @deprecated Use `modules` instead
+     */
     commands?: string;
     modules?: string;
 };

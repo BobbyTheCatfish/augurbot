@@ -48,7 +48,6 @@ export class AugurModule {
      * Augur will wait for one handler to finish before trying other handlers for the same event
      */
     addEvent<K extends keyof ClientEvents>(event: K, handler: (...args: ClientEvents[K]) => Promise<any> | any) {
-        if (this.events.has(event)) this.client.errorHandler(`Duplicate Event Handler: ${event}`, `Handler for ${event} in \`${this.filepath}\` already existed. It is being overwritten.`)
         this.events.set(event, handler);
         return this;
     }

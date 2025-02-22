@@ -19,6 +19,7 @@ export default class AugurClient extends Client {
     private readyEvent;
     private fetchMsg;
     private fetchReact;
+    private eventHandler;
     private start;
     constructor(config: BotConfig, options?: AugurOptions);
     destroy(): Promise<void>;

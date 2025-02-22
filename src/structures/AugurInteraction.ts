@@ -1,6 +1,7 @@
 import Discord from "discord.js"
 import { DefaultInteraction, NoAutoComplete } from "../types/ClientTypes"
 import { GuildDmInteraction, opBool } from "../types/UtilTypes"
+
 export type AugurInteractionInfo<K extends keyof NoAutoComplete | undefined, G extends opBool, D extends opBool> = {
     id: string
     name?: string

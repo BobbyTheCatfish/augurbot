@@ -86,6 +86,19 @@ export default class AugurClient extends Client {
         return obj;
     }
 
+    private async eventHandler(eventName: string, args: any[], errorMsg: Discord.Message | Discord.Interaction | ((path: string) => string)) {
+        for (const [filepath, handler] of this.moduleManager.events.get(eventName) ?? []) {
+            try {
+                if (await handler(...args)) return true;
+            } catch (error: any) {
+                if (errorMsg instanceof Function) this.errorHandler(error, errorMsg(filepath))
+                else this.errorHandler(error, errorMsg)
+                return true;
+            }
+        }
+        return false;
+    }
+
     private async start() {
         // HANDLE INITIALIZATION
         this.log("Bot started")
@@ -119,30 +132,19 @@ export default class AugurClient extends Client {
 
         if (this.config.events.includes("messageCreate")) {
             this.on("messageCreate", async (message) => {
-                if (message.interactionMetadata) {
+                if (("interactionMetadata" in message && message.interactionMetadata) || message.interaction) {
                     this.log("interaction message sent")
                     return;
                 }
                 this.log("message creation detected")
                 let halt = false;
                 if (this.moduleManager.events.has("messageCreate")) {
-                    let i = 0;
-                    const events = Array.from(this.moduleManager.events.get("messageCreate") ?? []);
-                    while (i < events.length && !halt) {
-                        const [filepath, handler] = events[i]
-
-                        try {
-                            halt = await handler(message)
-                            i++;
-                        } catch (error: any) {
-                            halt = true;
-                            this.errorHandler(error, message);
-                            break;
-                        }
-                    }
+                    halt = await this.eventHandler("messageCreate", [message], message)
                     this.log(`message parsing halted: ${Boolean(halt)}`)
                 }
+
                 if (halt) return;
+
                 try {
                     let parsed = await this.parse(message);
                     this.log(`message parsed: ${Boolean(parsed)}`)
@@ -155,67 +157,35 @@ export default class AugurClient extends Client {
 
         if (this.config.events.includes("messageUpdate")) {
             this.on("messageUpdate", async (old, message) => {
-                if (message.interactionMetadata) {
+                if (("interactionMetadata" in message && message.interactionMetadata) || message.interaction) {
                     this.log("interaction message edit")
                     return;
                 }
                 this.log("messageUpdate detected")
-                const isEdited = (message.editedTimestamp ?? 0) > Date.now() - 60 * 1000 && // filter cdn updates
-                    (old.pinned == null || old.pinned == message.pinned) // filter pins
-                this.log(`message is edited: ${isEdited}`)
+                
+                // fetch the message
+                const newMessage = await this.fetchMsg(message);
+                if (newMessage) message = newMessage;
+                else return;
+
+                const isEdited = (message.editedTimestamp ?? 0) > Date.now() - 30 * 60_000 && // filter old messages
+                                 (old.pinned == null || old.pinned == message.pinned) // filter pins
+                this.log(`message is ${isEdited ? "edited" : "not edited"}`)
                 let halt = false;
 
                 if (isEdited && this.moduleManager.events.has("messageEdit")) {
-                    this.log("message being handled as edited")
-                    const newMessage = await this.fetchMsg(message);
-                    if (newMessage) message = newMessage;
-                    else return;
-
-                    let i = 0;
-                    const events = Array.from(this.moduleManager.events.get("messageEdit")?.values() ?? []);
-                    while (i < events.length && !halt) {
-                        try {
-                            const handler = events[i]
-                            halt = await handler(old, message)
-                            i++;
-                        } catch (error: any) {
-                            this.errorHandler(error, message);
-                            halt = true;
-                            break;
-                        }
-                    }
+                    halt = await this.eventHandler("messageEdit", [old, message], message);
                     this.log(`message edit parsing halted: ${Boolean(halt)}`)
                 }
                 
                 if (this.moduleManager.events.has("messageUpdate") && !halt) {
-                    this.log("message being handled as updated")
-                    const newMessage = await this.fetchMsg(message);
-                    if (newMessage) message = newMessage;
-                    else return;
-
-                    let i = 0;
-                    const events = Array.from(this.moduleManager.events.get("messageUpdate")?.values() ?? []);
-                    while (i < events.length && !halt) {
-                        try {
-                            const handler = events[i]
-                            halt = await handler(old, message)
-                            i++;
-                        } catch (error: any) {
-                            this.errorHandler(error, message);
-                            halt = true;
-                            break;
-                        }
-                    }
+                    halt = await this.eventHandler("messageUpdate", [old, message], message)
                     this.log(`message parsing halted: ${Boolean(halt)}`)
                 }
 
                 if (halt || !isEdited) return;
 
                 try {
-                    const newMessage = await this.fetchMsg(message);
-                    if (newMessage) message = newMessage;
-                    else return;
-
                     const parsed = await this.parse(message);
                     this.log(`message parsed: ${Boolean(parsed)}`)
                     if (parsed) this.moduleManager.commands.execute(message, parsed);
@@ -229,29 +199,18 @@ export default class AugurClient extends Client {
             this.log("interaction creation detected")
             let halt = false;
             if (this.moduleManager.events.has("interactionCreate")) {
-                let i = 0;
-                const events = Array.from(this.moduleManager.events.get("interactionCreate") ?? []);
-                while (i < events.length && !halt) {
-                    const [file, handler] = events[i]
-                    try {
-                        halt = await handler(interaction)
-                        i++;
-                    } catch (error: any) {
-                        this.errorHandler(error, `interactionCreate Handler: ${file}`);
-                        halt = true;
-                        break;
-                    }
-                }
+                halt = await this.eventHandler("interactionCreate", [interaction], interaction)
                 this.log(`interactionCreate handling halted: ${Boolean(halt)}`)
             }
+
+            if (halt) return;
+            
             try {
                 this.log("executing interaction as addInteraction")
-                if (!halt) await this.moduleManager.interactions.get(
-                    interaction.isCommand() || interaction.isAutocomplete() ? interaction.commandId
-                    : interaction.customId
-                )?.execute(interaction);
+                const id = (interaction.isCommand() || interaction.isAutocomplete()) ? interaction.commandId : interaction.customId
+                await this.moduleManager.interactions.get(id)?.execute(interaction);
             } catch (error: any) {
-                this.errorHandler(error, `Interaction Processing: ${interaction.id}`);
+                this.errorHandler(error, interaction);
             }
         });
 
@@ -266,67 +225,41 @@ export default class AugurClient extends Client {
                     const newMessage = await this.fetchMsg(reaction.message);
                     if (newMessage) reaction.message = newMessage;
                     else return;
+
                     this.log("running all messageReactionAdd handlers")
-                    let i = 0;
-                    const events = Array.from(this.moduleManager.events.get("messageReactionAdd") ?? []);
-                    while (i < events.length) {
-                        const [file, handler] = events[i]
-                        try {
-                            if (await handler(reaction, user)) break;
-                            i++;
-                        } catch (error: any) {
-                            this.errorHandler(error, `messageReactionAdd Handler: ${file}`);
-                            break;
-                        }
-                    }
+                    await this.eventHandler("messageReactionAdd", [reaction, user], reaction.message)
                 }
             });
         }
 
-        let events = (this.config?.events || [])
-            .filter(event => ![
-                "message",
-                "messageCreate",
-                "messageUpdate",
-                "interactionCreate",
-                "messageReactionAdd",
-                "ready"
-            ].includes(event));
+        const events = new Set(this.config?.events || []);
+        events.delete("messageCreate");
+        events.delete("messageUpdate");
+        events.delete("interactionCreate");
+        events.delete("messageReactionAdd");
+        events.delete("ready");
 
         for (const event of events) {
             this.on(event, async (...args) => {
                 this.log(`${event} detected`)
                 if (this.moduleManager.events.has(event)) {
                     this.log(`handler(s) for ${event} found, trying now...`)
-                    let i = 0;
-                    const events = Array.from(this.moduleManager.events.get(event) ?? []);
-                    while (i < events.length) {
-                        const [file, handler] = events[i]
-                        try {
-                            if (await handler(...args)) break;
-                            i++;
-                        } catch (error: any) {
-                            this.errorHandler(error, `${event} Handler: ${file}`);
-                            break;
-                        }
-                    }
+                    await this.eventHandler(event, args, (f) => `${event} Handler: ${f}`)
                 }
             });
         }
     }
     constructor(config: BotConfig, options: AugurOptions = {}) {
         
-        const intents = calculateIntents(config.events, config.processDMs);
+        const intents = calculateIntents(config.events, config.getMessageContent, config.processDMs);
 
-        if (!options.clientOptions) options.clientOptions = {
-                intents
-        };
+        if (!options.clientOptions) options.clientOptions = { intents };
         else if (!options.clientOptions.intents) options.clientOptions.intents = intents
         
         super(options.clientOptions as Discord.ClientOptions);
 
         this.moduleManager = new ModuleManager(this);
-
+        
         this.augurOptions = options;
         this.config = config;
         this.db = (this.config.db?.model ? require(path.resolve((require.main ? path.dirname(require.main.filename) : process.cwd()), this.config.db.model)) : null);

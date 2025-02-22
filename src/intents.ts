@@ -1,191 +1,144 @@
-import { GatewayIntentBits, ClientEvents } from "discord.js";
+import { IntentsBitField, GatewayIntentsString, ClientEvents } from "discord.js";
+
+const Intents: Record<GatewayIntentsString, (keyof ClientEvents)[]> = {
+  AutoModerationConfiguration: [
+    'autoModerationRuleCreate',
+    'autoModerationRuleUpdate',
+    'autoModerationRuleDelete'
+  ],
+  AutoModerationExecution: [
+    'autoModerationActionExecution'
+  ],
+  DirectMessageReactions: [
+    'messageReactionAdd',
+    'messageReactionRemove',
+    'messageReactionRemoveAll',
+    'messageReactionRemoveEmoji'
+  ],
+  DirectMessages: [
+    'messageCreate',
+    'messageUpdate',
+    'messageDelete',
+    'channelPinsUpdate'
+  ],
+  DirectMessageTyping: [
+    'typingStart'
+  ],
+  GuildBans: [
+    "guildBanAdd",
+    "guildBanRemove"
+  ],
+  Guilds: [
+    'guildCreate',
+    'guildUpdate',
+    'guildDelete',
+    'roleCreate',
+    'roleUpdate',
+    'roleDelete',
+    'channelCreate',
+    'channelUpdate',
+    'channelDelete',
+    'channelPinsUpdate',
+    'threadCreate',
+    'threadUpdate',
+    'threadDelete',
+    'threadListSync',
+    'threadMemberUpdate', 
+    'threadMembersUpdate', // depends on GUILD_MEMBERS optional intent
+    'stageInstanceCreate',
+    'stageInstanceUpdate',
+    'stageInstanceDelete',
+  ],
+  GuildMembers: [
+    'guildMemberAdd',
+    'guildMemberUpdate',
+    'guildMemberRemove',
+    'guildMembersChunk',
+    'threadMembersUpdate' // depends on GUILD_MEMBERS optional intent
+  ],
+  GuildEmojisAndStickers: [
+    "emojiUpdate",
+    "stickerUpdate",
+    // "soundCreate",
+    // "soundUpdate",
+    // "soundDelete",
+    // "soundsUpdate"
+  ],
+  GuildIntegrations: [
+    "guildIntegrationsUpdate",
+    // "integrationCreate",
+    // "integrationUpdate",
+    // "integrationDelete"
+  ],
+  GuildInvites: [
+    "inviteCreate",
+    "inviteDelete"
+  ],
+  GuildMessageReactions: [
+    "messageReactionAdd",
+    "messageReactionRemove",
+    "messageReactionRemoveAll",
+    "messageReactionRemoveEmoji"
+  ],
+  GuildMessages: [
+    "messageCreate",
+    "messageUpdate",
+    "messageDelete",
+    "messageDeleteBulk"
+  ],
+  GuildMessageTyping: [
+    "typingStart"
+  ],
+  GuildModeration: [
+    "guildAuditLogEntryCreate",
+    "guildBanAdd",
+    "guildBanRemove"
+  ],
+  GuildPresences: [
+    "presenceUpdate"
+  ],
+  GuildScheduledEvents: [
+    "guildScheduledEventCreate",
+    "guildScheduledEventUpdate",
+    "guildScheduledEventDelete",
+    "guildScheduledEventUserRemove",
+    "guildScheduledEventUserRemove"
+  ],
+  GuildVoiceStates: [
+    "voiceStateUpdate",
+    // @ts-ignore exists in newer versions
+    "voiceChannelEffectSend"
+  ],
+  GuildWebhooks: [
+    "webhooksUpdate",
+    // "webhookUpdate"
+  ],
+  GuildMessagePolls: [
+    "messagePollVoteAdd",
+    "messagePollVoteRemove"
+  ],
+  DirectMessagePolls: [
+    "messagePollVoteAdd",
+    "messagePollVoteRemove"
+  ]
+}
 
 
-const Intents: {intent: number, events: (keyof ClientEvents)[]}[] = [
-  {
-    intent: GatewayIntentBits.Guilds,
-    events: [
-      'guildCreate',
-      'guildUpdate',
-      'guildDelete',
-      'guildAvailable',
-      'guildUnavailable',
-      'roleCreate',
-      'roleUpdate',
-      'roleDelete',
-      'channelCreate',
-      'channelUpdate',
-      'channelDelete',
-      'channelPinsUpdate',
-      'threadCreate',
-      'threadUpdate',
-      'threadDelete',
-      'threadListSync',
-      'threadMemberUpdate',
-      'threadMembersUpdate',
-      'stageInstanceCreate',
-      'stageInstanceUpdate',
-      'stageInstanceDelete',
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildMembers,
-    events: [
-      'guildMemberAdd',
-      'guildMemberUpdate',
-      'guildMemberRemove',
-      'guildMembersChunk',
-      'guildMemberAvailable',
-      'threadMembersUpdate'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildModeration,
-    events: [
-      'guildAuditLogEntryCreate',
-      'guildBanAdd',
-      'guildBanRemove'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildEmojisAndStickers,
-    events: [
-      'emojiCreate',
-      'emojiDelete',
-      'emojiUpdate',
-      'stickerCreate',
-      'stickerDelete',
-      'stickerUpdate'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildIntegrations,
-    events: [
-      'guildIntegrationsUpdate',
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildWebhooks,
-    events: [
-      'webhooksUpdate',
-      'webhookUpdate'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildInvites,
-    events: [
-      'inviteCreate',
-      'inviteDelete'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildVoiceStates,
-    events: [
-      'voiceStateUpdate'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildPresences,
-    events: [
-      'presenceUpdate',
-      'userUpdate'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildMessages,
-    events: [
-      'messageCreate',
-      'messageUpdate',
-      'messageDelete',
-      'messageDeleteBulk'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildMessageReactions,
-    events: [
-      'messageReactionAdd',
-      'messageReactionRemove',
-      'messageReactionRemoveAll',
-      'messageReactionRemoveEmoji'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildMessageTyping,
-    events: [
-      'typingStart'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.DirectMessages,
-    events: [
-      'messageCreate',
-      'messageUpdate',
-      'messageDelete',
-      'channelPinsUpdate'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.DirectMessageReactions,
-    events: [
-      'messageReactionAdd',
-      'messageReactionRemove',
-      'messageReactionRemoveAll',
-      'messageReactionRemoveEmoji'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.DirectMessageTyping,
-    events: [
-      'typingStart'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.MessageContent,
-    events: [
-      'messageCreate',
-      'messageUpdate',
-      'messageDelete',
-      'channelPinsUpdate'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.GuildScheduledEvents,
-    events: [
-      'guildScheduledEventCreate',
-      'guildScheduledEventUpdate',
-      'guildScheduledEventDelete',
-      'guildScheduledEventUserAdd',
-      'guildScheduledEventUserRemove'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.AutoModerationConfiguration,
-    events: [
-      'autoModerationRuleCreate',
-      'autoModerationRuleUpdate',
-      'autoModerationRuleDelete'
-    ]
-  },
-  {
-    intent: GatewayIntentBits.AutoModerationExecution,
-    events: [
-      'autoModerationActionExecution'
-    ]
+
+function calcIntent(clientEvents: (keyof ClientEvents)[], messageContent = false, dms = true) {
+  const intents = new IntentsBitField();
+  const uniqueIntents = new Set(clientEvents)
+  const dmIntents: Set<GatewayIntentsString> = new Set(["DirectMessageReactions", "DirectMessageTyping", "DirectMessages"])
+
+  for (const intent in Intents) {
+    if (dmIntents.has(intent as GatewayIntentsString) && !dms) continue;
+
+    const events = Intents[intent as GatewayIntentsString]
+    if (events.find(e => uniqueIntents.has(e))) intents.add(intent as GatewayIntentsString)
   }
-]
 
-//Not sure if these two need any intents, but I don't think they do
-//.set("applicationCommandPermissionsUpdate", )
-//.set("interactionCreate", )
-
-
-function calcIntent(clientEvents: (keyof ClientEvents)[], dms = true) {
-  const intents = []
-  for (const intent of Intents) {
-    if (intent.events.find((e) => clientEvents.includes(e))) intents.push(intent.intent)
-  }
-  if (!dms) intents.filter(i => ![GatewayIntentBits.DirectMessages, GatewayIntentBits.DirectMessageReactions, GatewayIntentBits.DirectMessageTyping].includes(i))
-  return intents
+  if (messageContent) intents.add("MessageContent");
+  return intents.bitfield
 }
 
 export default calcIntent

@@ -1,3 +1,4 @@
 node_modules
 augurbot.code-workspace
 test
+src/testing
