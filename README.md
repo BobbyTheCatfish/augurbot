@@ -50,7 +50,7 @@ Processing Order:
 0) Bot is logged in and ready, but `ready` event handlers are not triggered yet
 1) The application ID is fetched
 2) AugurOptions.delayStart is called
-3) Modules are loaded (init > clockwork > events > commands > interactions > shared functions)
+3) Modules are loaded (init > clockwork > events > commands > interactions > shared)
 4) Augur is ready and triggers any `ready` event handlers
 <br>
 
@@ -143,7 +143,7 @@ In between, you can add one or more commands and event handlers, as well as a cl
 *  [clockwork](#clockwork): The clockwork set in the module
 *  [init](#initialization) and [unload](#unloading): The initialized and unloaded data
 *  [events](#events): A collection of events in the module
-*  [shared](#sharing-functionsvariables-between-files): A collection of variables and functions that can be shared with other modules
+*  [shared](#sharing-functionsvariables-between-files): A variable or function to be shared across multiple modules
 
 <br/>
 All of the following methods are chainable:
@@ -270,17 +270,18 @@ Module.setUnload(() => {
 ### Sharing Functions/Variables Between Files
 ```js
 // module_1.js
-Module.addShared("update", (update) => {
-    console.log(update)
-})
-.addShared("importantVar", veryImportantVariable);
+
+const func = (update) => console.log(update)
+const foo = "bar"
+Module.setShared({ func, foo });
 
 // module_2.js
 Module.addCommand({
     name: "remoteupdate",
     process: (msg) => {
-        msg.client.shared.get("update")?.shared("Here's your update of the day!")
-        console.log(msg.client.shared.get("importantVar")?.shared)
+        const shared = msg.client.moduleManager.shared.get("module_1.js")
+        shared?.func("Here's your update of the day!")
+        console.log(shared?.foo)
     }
 })
 ```

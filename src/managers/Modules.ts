@@ -1,5 +1,4 @@
 import { Client } from 'discord.js'
-import { SharedFunction } from "../types/ClientTypes"
 import path from 'path'
 import ClockworkManager from './Clockwork'
 import CommandManager from './Commands'
@@ -14,7 +13,7 @@ export default class ModuleManager {
     events: EventManager
     interactions: InteractionManager
     unloads: Map<string, Function>
-    shared: Map<string, SharedFunction>
+    shared: Map<string, any>
     constructor(client: Client) {
         this.client = client;
         this.clockwork = new ClockworkManager(client);
@@ -52,11 +51,7 @@ export default class ModuleManager {
                 this.interactions.register(load);
 
                 // REGISTER SHARED FUNCTIONS/VARIABLES
-                for (const [key, share] of load.shared) {
-                    const existing = this.shared.get(key);
-                    if (existing) this.client.errorHandler(`Duplicate Shared Identifier: ${key}`, `Identifier ${key} already registered at ${existing.filepath}. It is being overwritten by ${load.filepath}.`)
-                    this.shared.set(key, share);
-                }
+                if (load.shared) this.shared.set(path.basename(filepath), load.shared)
 
                 // REGISTER UNLOAD FUNCTION
                 if (load.unload) this.unloads.set(filepath, load.unload);
@@ -114,9 +109,7 @@ export default class ModuleManager {
                 }
 
                 // Clear Shared Functions/variables
-                for (let [identifier, funcObject] of this.shared) {
-                    if (funcObject.filepath === filepath) this.shared.delete(identifier);
-                }
+                this.shared.delete(path.basename(filepath));
 
                 // Clear Require Cache
                 delete require.cache[require.resolve(filepath)];

@@ -1,7 +1,7 @@
 import Discord, { Collection } from "discord.js";
 import { AugurCommand, AugurCommandInfo } from "./AugurCommand";
 import { AugurInteraction, AugurInteractionInfo } from "./AugurInteraction";
-import { BotConfig, Clockwork, InitFunction, NoAutoComplete, SharedFunction, UnloadFunction } from "../types/ClientTypes";
+import { BotConfig, Clockwork, InitFunction, NoAutoComplete, UnloadFunction } from "../types/ClientTypes";
 import { ClientEvents, opBool } from "../types/UtilTypes";
 /**
  * The main method of interacting with Discord. Add handlers for commands, events, timers, and more!
@@ -10,7 +10,7 @@ export declare class AugurModule {
     commands: AugurCommand[];
     interactions: AugurInteraction[];
     events: Collection<string, Function>;
-    shared: Collection<string, SharedFunction>;
+    shared: any;
     config: BotConfig | {};
     client: Discord.Client;
     clockwork?: Clockwork;
@@ -43,7 +43,7 @@ export declare class AugurModule {
     /**
      * Used to share common functions or variables between modules without using hacky `module.exports` methods
      */
-    addShared(identifier: string, toShare: any): this;
+    setShared(toShare: any): this;
     /**
      * Runs a function on an interval. The client object is provided to the function.
      */

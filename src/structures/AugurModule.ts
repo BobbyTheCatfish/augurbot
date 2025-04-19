@@ -1,7 +1,7 @@
 import Discord, { Collection } from "discord.js"
 import { AugurCommand, AugurCommandInfo } from "./AugurCommand"
 import { AugurInteraction, AugurInteractionInfo } from "./AugurInteraction"
-import { BotConfig, Clockwork, InitFunction, NoAutoComplete, SharedFunction, UnloadFunction } from "../types/ClientTypes"
+import { BotConfig, Clockwork, InitFunction, NoAutoComplete, UnloadFunction } from "../types/ClientTypes"
 import { ClientEvents, opBool } from "../types/UtilTypes"
 
 /**
@@ -11,7 +11,7 @@ export class AugurModule {
     commands: AugurCommand[]
     interactions: AugurInteraction[]
     events: Collection<string, Function>
-    shared: Collection<string, SharedFunction>
+    shared: any
     config: BotConfig | {}
     client!: Discord.Client
     clockwork?: Clockwork
@@ -24,7 +24,7 @@ export class AugurModule {
         this.commands = [];
         this.interactions = [];
         this.events = new Collection();
-        this.shared = new Collection();
+        this.shared = undefined;
         this.config = {};
     }
 
@@ -63,8 +63,8 @@ export class AugurModule {
     /**
      * Used to share common functions or variables between modules without using hacky `module.exports` methods
      */
-    addShared(identifier: string, toShare: any) {
-        this.shared.set(identifier, { filepath: "", shared: toShare });
+    setShared(toShare: any) {
+        this.shared = toShare;
         return this;
     }
 

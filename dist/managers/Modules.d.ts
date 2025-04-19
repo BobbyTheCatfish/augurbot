@@ -1,5 +1,4 @@
 import { Client } from 'discord.js';
-import { SharedFunction } from "../types/ClientTypes";
 import ClockworkManager from './Clockwork';
 import CommandManager from './Commands';
 import EventManager from './Events';
@@ -12,7 +11,7 @@ export default class ModuleManager {
     events: EventManager;
     interactions: InteractionManager;
     unloads: Map<string, Function>;
-    shared: Map<string, SharedFunction>;
+    shared: Map<string, any>;
     constructor(client: Client);
     register(file: string, data?: AugurModule): this;
     reload(file: string): this;

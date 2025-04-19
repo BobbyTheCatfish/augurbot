@@ -44,11 +44,6 @@ export type InitFunction = (load: any) => any;
 export type UnloadFunction = () => any;
 /** Function to run a timeout on module load */
 export type Clockwork = (client: Discord.Client) => NodeJS.Timeout;
-/** Function to share between modules */
-export type SharedFunction = {
-    filepath: string;
-    shared: any;
-};
 export type InteractionTypes<K extends Discord.CacheType = Discord.CacheType> = {
     AutoComplete: Discord.AutocompleteInteraction<K>;
     Any: Discord.Interaction<K>;
