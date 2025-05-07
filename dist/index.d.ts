@@ -3,7 +3,7 @@ import AugurClient from './structures/AugurClient';
 import { AugurModule } from "./structures/AugurModule";
 import ModuleManager from "./managers/Modules";
 import { BotConfig, AugurOptions, CommandExecution, InteractionExecution, GuildInteraction } from "./types/ClientTypes";
-import { ErrorHandler, Parsed, ParseFunction } from "./types/UtilTypes";
+import { ErrorHandler, NonPartialMessageReaction, Parsed, ParseFunction } from "./types/UtilTypes";
 import DEFAULTS from "./structures/defaults";
 declare module 'discord.js' {
     interface Client {
@@ -35,4 +35,4 @@ declare module 'discord.js' {
 /**************
  **  EXPORTS  **
  **************/
-export { AugurClient, AugurModule as Module, Parsed as parsed, BotConfig, GuildInteraction, DEFAULTS as defaults, };
+export { AugurClient, AugurModule as Module, Parsed as parsed, BotConfig, GuildInteraction, NonPartialMessageReaction, DEFAULTS as defaults, };

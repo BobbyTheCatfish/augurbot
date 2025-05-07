@@ -6,7 +6,7 @@ export type Parsed = {
     params: string[]
 }
 
-type NonPartialMessageReaction = Omit<Discord.MessageReaction, "message"> & { message: Discord.Message }
+export type NonPartialMessageReaction = Omit<Discord.MessageReaction, "message"> & { message: Discord.Message }
 
 export type ClientEvents = Omit<Discord.ClientEvents, "messageUpdate" | "messageReactionAdd"> & {
     messageReactionAdd: [reaction: NonPartialMessageReaction, user: Discord.User]

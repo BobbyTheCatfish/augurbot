@@ -4,7 +4,7 @@ export type Parsed = {
     suffix: string;
     params: string[];
 };
-type NonPartialMessageReaction = Omit<Discord.MessageReaction, "message"> & {
+export type NonPartialMessageReaction = Omit<Discord.MessageReaction, "message"> & {
     message: Discord.Message;
 };
 export type ClientEvents = Omit<Discord.ClientEvents, "messageUpdate" | "messageReactionAdd"> & {
@@ -17,4 +17,3 @@ export type ParseFunction = (message: Discord.Message) => Promise<Parsed | null>
 export type opBool = boolean | undefined;
 export type GuildDmMessage<G extends opBool, D extends opBool> = undefined extends G ? undefined extends D ? boolean : true extends D ? false : boolean : true extends G ? true : boolean;
 export type GuildDmInteraction<G extends opBool, D extends opBool> = GuildDmMessage<G, D> extends true ? "cached" : Discord.CacheType;
-export {};
