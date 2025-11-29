@@ -113,7 +113,8 @@ export default class AugurClient extends Client {
             if (moduleFolder) {
                 const commandPath = path.resolve(require.main ? path.dirname(require.main.filename) : process.cwd(), moduleFolder);
                 try {
-                    const commandFiles = fs.readdirSync(commandPath).filter(f => f.endsWith(".js"));
+                    const tsCheck = process.versions.bun !== undefined || process.versions.deno !== undefined;
+                    const commandFiles = fs.readdirSync(commandPath).filter(f => f.endsWith(".js") || (tsCheck && f.endsWith(".ts")));
                     for (const command of commandFiles) {
                         try {
                             this.moduleManager.register(path.resolve(commandPath, command));

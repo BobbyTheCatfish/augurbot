@@ -73,16 +73,16 @@ const DEFAULTS = {
         }
     }),
     interactionExecution: (cmd, interaction) => __awaiter(void 0, void 0, void 0, function* () {
-        var _c, _d;
+        var _a, _b;
         try {
             let reply = "";
             /**Enabled*/ if (!cmd.enabled)
                 return;
-            /**Only Owner*/ else if (cmd.onlyOwner && ((_c = interaction.member) === null || _c === void 0 ? void 0 : _c.user.id) != cmd.client.config.ownerId)
+            /**Only Owner*/ else if (cmd.onlyOwner && ((_a = interaction.member) === null || _a === void 0 ? void 0 : _a.user.id) != cmd.client.config.ownerId)
                 return;
             /**Only Guild*/ else if (cmd.onlyGuild && !interaction.guild)
                 reply = `That command can only be used in a server.`;
-            /**Only Specific Guild*/ else if (cmd.guildId && ((_d = interaction.guild) === null || _d === void 0 ? void 0 : _d.id) != cmd.guildId)
+            /**Only Specific Guild*/ else if (cmd.guildId && ((_b = interaction.guild) === null || _b === void 0 ? void 0 : _b.id) != cmd.guildId)
                 reply = `That command can only be used in a specific server.`;
             /**Only DM*/ else if (cmd.onlyDm && interaction.guild)
                 reply = `That command can only be used in a DM`;

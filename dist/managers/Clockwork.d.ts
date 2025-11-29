@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import { Collection, Client } from 'discord.js';
 import { AugurModule } from '../structures/AugurModule';
 export default class ClockworkManager extends Collection<string, NodeJS.Timeout> {

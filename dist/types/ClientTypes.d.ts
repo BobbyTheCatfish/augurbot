@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import { AugurCommand } from "../structures/AugurCommand";
 import { AugurInteraction } from "../structures/AugurInteraction";
 import { ErrorHandler, ParseFunction } from "./UtilTypes";

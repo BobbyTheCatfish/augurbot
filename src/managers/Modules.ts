@@ -28,7 +28,11 @@ export default class ModuleManager {
         if (file) {
             let filepath = path.resolve(file);
             try {
-                const load: AugurModule = require(filepath);
+                let load: AugurModule | { default: AugurModule } = require(filepath);
+                if (!(load instanceof AugurModule)) {
+                    if ("default" in load) load = load.default as AugurModule
+                    else throw new Error(`${file} is not an instance of AugurModule. Either do module.exports = <AugurModule> or export default <AugurModule>`)
+                }
 
                 load.config = this.client.config;
                 load.db = this.client.db;
