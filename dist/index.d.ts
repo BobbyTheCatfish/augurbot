@@ -5,6 +5,7 @@ import ModuleManager from "./managers/Modules";
 import { BotConfig, AugurOptions, CommandExecution, InteractionExecution, GuildInteraction } from "./types/ClientTypes";
 import { ErrorHandler, NonPartialMessageReaction, Parsed, ParseFunction } from "./types/UtilTypes";
 import DEFAULTS from "./structures/defaults";
+import utils from "./structures/utils/Subcommands";
 declare module 'discord.js' {
     interface Client {
         config: BotConfig;
@@ -35,4 +36,4 @@ declare module 'discord.js' {
 /**************
  **  EXPORTS  **
  **************/
-export { AugurClient, AugurModule as Module, Parsed as parsed, BotConfig, GuildInteraction, NonPartialMessageReaction, DEFAULTS as defaults, };
+export { AugurClient, AugurModule as Module, Parsed as parsed, BotConfig, GuildInteraction, NonPartialMessageReaction, DEFAULTS as defaults, utils };

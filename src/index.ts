@@ -5,6 +5,7 @@ import ModuleManager from "./managers/Modules"
 import { BotConfig, AugurOptions, CommandExecution, InteractionExecution, GuildInteraction } from "./types/ClientTypes"
 import { ErrorHandler, NonPartialMessageReaction, Parsed, ParseFunction } from "./types/UtilTypes"
 import DEFAULTS from "./structures/defaults"
+import utils from "./structures/utils/Subcommands"
 
 declare module 'discord.js' {
     interface Client {
@@ -52,4 +53,5 @@ export {
     GuildInteraction,
     NonPartialMessageReaction,
     DEFAULTS as defaults,
+    utils
 }
